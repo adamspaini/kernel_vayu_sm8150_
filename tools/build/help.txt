@@ -1,0 +1,10 @@
+Available commands are:
+dl_debs (Download debs): Used for downloading required packages that kernel needs
+
+m: Used for build the kernel using build.sh that found at tools/build/build.sh
+
+mclean: Used for removing the whole compiled files
+
+mqc (Quick clean): Used for removing some of the generated files and images
+
+sync: Used for upstream local source with the updated source and installing submodules
