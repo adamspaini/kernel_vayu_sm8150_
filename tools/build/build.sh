@@ -11,22 +11,37 @@ ZIMAGE=$kernel_dir/out/arch/arm64/boot/Image
 kernel_name="GoreKernel_Vayu_nonksu"
 zip_name="$kernel_name$(date +"%Y%m%d").zip"
 CLANG_DIR=tc/clang
+GCC64_DIR=tc/gcc64
+GCC32_DIR=tc/gcc32
 export CONFIG_FILE="vayu_defconfig"
 export ARCH="arm64"
 export KBUILD_BUILD_HOST=@adams4d13
 export KBUILD_BUILD_USER=arch-linux
 
-export PATH="$CLANG_DIR/bin:$PATH"
+export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
 
+# Proton Clang
 if ! [ -d "$CLANG_DIR" ]; then
-    echo "Toolchain not found! Cloning to $CLANG_DIR..."
-    if ! git clone --depth=1 https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r536225.git -b 15.0 $CLANG_DIR; then
-        echo "Cloning failed! Aborting..."
+    echo "Clonando Proton Clang..."
+    if ! git clone --depth=1 https://github.com/kdrag0n/proton-clang.git $CLANG_DIR; then
+        echo "¡Fallo al clonar Proton Clang!"
         exit 1
     fi
 fi
 
-# Colors
+# GCC64
+if ! [ -d "$GCC64_DIR" ]; then
+    echo "Clonando GCC64..."
+    git clone --depth=1 https://github.com/mvaisakh/gcc-arm64.git $GCC64_DIR
+fi
+
+# GCC32
+if ! [ -d "$GCC32_DIR" ]; then
+    echo "Clonando GCC32..."
+    git clone --depth=1 https://github.com/mvaisakh/gcc-arm.git $GCC32_DIR
+fi
+
+# Colores
 NC='\033[0m'
 RED='\033[0;31m'
 LRD='\033[1;31m'
@@ -34,17 +49,17 @@ LGR='\033[1;32m'
 
 make_defconfig()
 {
-    START=$(date +"%s")
-    echo -e ${LGR} "########### Generating Defconfig ############${NC}"
+    echo -e ${LGR} "########### Generando Defconfig ############${NC}"
     make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc --all)
 }
+
 compile()
 {
     cd ${kernel_dir}
-    echo -e ${LGR} "######### Compiling kernel #########${NC}"
+    echo -e ${LGR} "######### Compilando kernel #########${NC}"
     make -j$(nproc --all) \
     O=out \
-    ARCH=${ARCH}\
+    ARCH=${ARCH} \
     CC="ccache clang" \
     CROSS_COMPILE=aarch64-linux-gnu- \
     CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
@@ -63,25 +78,20 @@ completion()
     COMPILED_IMAGE=arch/arm64/boot/Image
     COMPILED_DTBO=arch/arm64/boot/dtbo.img
     if [[ -f ${COMPILED_IMAGE} && ${COMPILED_DTBO} ]]; then
-
         git clone -q https://github.com/GXC2356/AnyKernel3.git -b master $anykernel
-
         mv -f $ZIMAGE ${COMPILED_DTBO} $anykernel
-
         cd $anykernel
-        find . -name "*.zip" -type f
-        find . -name "*.zip" -type f
         zip -r AnyKernel.zip *
         mv AnyKernel.zip $zip_name
         mv $anykernel/$zip_name $HOME/$zip_name
         rm -rf $anykernel
-        echo -e ${LGR} "#### build completed successfully (hh:mm:ss) ####"
+        echo -e ${LGR} "#### build completed successfully ####"
         exit 0
     else
-        echo -e ${LGR} "#### failed to build some targets (hh:mm:ss) ####"
-
+        echo -e ${LGR} "#### failed to build some targets ####"
     fi
 }
+
 make_defconfig
 compile | tee out/log.txt
 completion
