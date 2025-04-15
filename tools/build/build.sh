@@ -23,7 +23,7 @@ export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
 # ZyC Clang 21.0
 if ! [ -d "$CLANG_DIR" ]; then
     echo "Clonando ZyC Clang 21.0..."
-    if ! git clone --depth=1 https://github.com/ZyCromerZ/clang.git -b 21.0 $CLANG_DIR; then
+    if ! git clone --depth=1 https://github.com/ZyCromerZ/clang.git -b 19.0.0git-20240306 $CLANG_DIR; then
         echo "¡Fallo al clonar ZyC Clang 21.0!"
         exit 1
     fi
