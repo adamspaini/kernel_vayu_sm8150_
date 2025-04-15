@@ -48,7 +48,8 @@ LRD='\033[1;31m'
 LGR='\033[1;32m'
 
 make_defconfig()
-{
+{   
+    START=$(date +"%s")
     echo -e ${LGR} "########### Generando Defconfig ############${NC}"
     make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc --all)
 }
@@ -58,7 +59,7 @@ compile()
     cd ${kernel_dir}
     echo -e ${LGR} "######### Compilando kernel #########${NC}"
     make -j$(nproc --all) \ 
-    0=out \
+    O=out \
     ARCH=arm64 \
     SUBARCH=arm64 \
     DTC_EXT=dtc \
