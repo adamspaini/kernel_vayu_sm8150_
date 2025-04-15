@@ -59,9 +59,7 @@ compile()
     cd ${kernel_dir}
     echo -e ${LGR} "######### Compilando kernel #########${NC}"
     make -j$(nproc --all) \
-        O=${objdir} \
         O=out \
-        ARCH=${ARCH}\
         ARCH=arm64 \
         SUBARCH=arm64 \
         CLANG_TRIPLE=aarch64-linux-gnu- \
