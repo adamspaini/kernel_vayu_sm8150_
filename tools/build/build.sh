@@ -58,30 +58,30 @@ compile()
 {
     cd ${kernel_dir}
     echo -e ${LGR} "######### Compilando kernel #########${NC}"
-    make -j$(nproc --all) \ 
-    O=out \
-    ARCH=arm64 \
-    SUBARCH=arm64 \
-    DTC_EXT=dtc \
-    CLANG_TRIPLE=aarch64-linux-gnu- \
-    CROSS_COMPILE=aarch64-linux-gnu- \
-    CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-    CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
-    LD=ld.lld \
-    AR=1lvm-ar \
-    NM=llvm-nm \
-    STRIP=1lvm-strip \
-    OBJCOPY=llvm-objcopy \
-    OBJDUMP=1lvm-objdump \
-    READELF=1lvm-readelf \
-    HOSTCC=clang \
-    HOSTCXX=clang++ \
-    HOSTAR=llvm-ar \
-    HOSTLD=ld.lld \
-    LLVM=1 \
-    LLVM_IAS=1 \
-    CC="ccache clang" \
-    "$1"
+    make -j$(nproc --all) \
+        O=${objdir} \
+        O=out \
+        ARCH=${ARCH}\
+        ARCH=arm64 \
+        SUBARCH=arm64 \
+        CLANG_TRIPLE=aarch64-linux-gnu- \
+        CROSS_COMPILE=aarch64-linux-gnu- \
+        CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+        CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+        LD=ld.lld \
+        AR=llvm-ar \
+        NM=llvm-nm \
+        STRIP=llvm-strip \
+        OBJCOPY=llvm-objcopy \
+        OBJDUMP=llvm-objdump \
+        READELF=llvm-readelf \
+        HOSTCC=clang \
+        HOSTCXX=clang++ \
+        HOSTAR=llvm-ar \
+        HOSTLD=ld.lld \
+        LLVM=1 LLVM_IAS=1 \
+        CC="ccache clang" \
+        "$1"
 }
 
 completion()
