@@ -20,11 +20,11 @@ export KBUILD_BUILD_USER=arch-linux
 
 export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
 
-# Proton Clang
+# ZyC Clang 21.0
 if ! [ -d "$CLANG_DIR" ]; then
-    echo "Clonando Proton Clang..."
-    if ! git clone --depth=1 https://github.com/kdrag0n/proton-clang.git $CLANG_DIR; then
-        echo "¡Fallo al clonar Proton Clang!"
+    echo "Clonando ZyC Clang 21.0..."
+    if ! git clone --depth=1 https://github.com/ZyCromerZ/clang.git $CLANG_DIR -b 21.0; then
+        echo "¡Fallo al clonar ZyC Clang 21.0!"
         exit 1
     fi
 fi
@@ -59,17 +59,28 @@ compile()
     echo -e ${LGR} "######### Compilando kernel #########${NC}"
     make -j$(nproc --all) \
     O=out \
-    ARCH=${ARCH} \
-    CC="ccache clang" \
-    CROSS_COMPILE=aarch64-linux-gnu- \
-    CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+    ARCH=arm64                              \
+    SUBARCH=arm64                           \
+    DTC_EXT=dtc				    \
+    CLANG_TRIPLE=aarch64-linux-gnu-         \
+    CROSS_COMPILE=aarch64-linux-gnu-        \
+    CROSS_COMPILE_ARM32=arm-linux-gnueabi-  \
     CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-    AR=llvm-ar \
-    LLVM_NM=llvm-nm \
-    OBJCOPY=llvm-objcopy \
-    LD=ld.lld NM=llvm-nm \
-    LLVM=1 \
-    LLVM_IAS=1
+    LD=ld.lld                               \
+    AR=llvm-ar                              \
+    NM=llvm-nm                              \
+    STRIP=llvm-strip                        \
+    OBJCOPY=llvm-objcopy                    \
+    OBJDUMP=llvm-objdump                    \
+    READELF=llvm-readelf                    \
+    HOSTCC=clang                            \
+    HOSTCXX=clang++                         \
+    HOSTAR=llvm-ar                          \
+    HOSTLD=ld.lld                           \
+    LLVM=1                                  \
+    LLVM_IAS=1                              \
+    CC="ccache clang"                       \
+    $1
 }
 
 completion()
