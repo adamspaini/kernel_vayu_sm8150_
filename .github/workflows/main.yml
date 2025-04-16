@@ -91,7 +91,13 @@ jobs:
               LLVM=1 \
               LLVM_IAS=1 \
               CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
-              |& tee ../build.log
+              2>&1 | tee ../build.log
+
+          # Explicitly build required images
+          make O=out ARCH=arm64 Image.gz-dtb dtbo.img \
+              CC="ccache clang" \
+              LD=ld.lld \
+              2>&1 | tee -a ../build.log
 
       - name: Save ccache cache
         uses: actions/cache/save@v4
@@ -99,30 +105,54 @@ jobs:
           path: ~/.ccache
           key: ccache-${{ github.ref }}-${{ github.run_id }}
 
-      - name: Check if kernel image exists
+      - name: Check build artifacts
         run: |
           kernel_dir="${PWD}/kernel"
           objdir="${kernel_dir}/out"
-          builddir="${kernel_dir}/build"
-          ZIMAGE=$kernel_dir/out/arch/arm64/boot/Image
-          cd ${kernel_dir}
-          cd ${objdir}
           
-          COMPILED_IMAGE=arch/arm64/boot/Image
-          COMPILED_DTBO=arch/arm64/boot/dtbo.img
+          echo "Checking build artifacts in: ${objdir}/arch/arm64/boot/"
+          ls -la "${objdir}/arch/arm64/boot/" || true
           
-          if [[ -f ${COMPILED_IMAGE} && -f ${COMPILED_DTBO} ]]; then
-            echo "Kernel and DTBO found, proceeding..."
+          # Check for kernel image
+          if [[ -f "${objdir}/arch/arm64/boot/Image.gz-dtb" ]]; then
+            echo "Found Image.gz-dtb"
+          elif [[ -f "${objdir}/arch/arm64/boot/Image" ]]; then
+            echo "Found Image (will create Image.gz-dtb later)"
           else
-            echo "Build failed: kernel image or DTBO not found."
+            echo "ERROR: No kernel image found!"
             exit 1
           fi
 
-      - name: Move kernel to AnyKernel3
+          # Check for DTBO (optional)
+          if [[ -f "${objdir}/arch/arm64/boot/dtbo.img" ]]; then
+            echo "Found dtbo.img"
+          else
+            echo "WARNING: dtbo.img not found (may be normal for some kernels)"
+          fi
+
+      - name: Prepare AnyKernel3 files
         run: |
           kernel_dir="${PWD}/kernel"
-          cp $kernel_dir/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-          cp $kernel_dir/out/arch/arm64/boot/dtbo.img AnyKernel3/
+          objdir="${kernel_dir}/out"
+          
+          # Handle kernel image
+          if [[ -f "${objdir}/arch/arm64/boot/Image.gz-dtb" ]]; then
+            cp "${objdir}/arch/arm64/boot/Image.gz-dtb" AnyKernel3/
+          elif [[ -f "${objdir}/arch/arm64/boot/Image" ]]; then
+            echo "Creating Image.gz-dtb from Image"
+            gzip -nc9 "${objdir}/arch/arm64/boot/Image" > AnyKernel3/Image.gz
+            dtb_path=$(find "${objdir}/arch/arm64/boot/dts" -name '*.dtb' | head -1)
+            if [[ -f "$dtb_path" ]]; then
+              cat AnyKernel3/Image.gz "$dtb_path" > AnyKernel3/Image.gz-dtb
+            else
+              mv AnyKernel3/Image.gz AnyKernel3/Image.gz-dtb
+            fi
+          fi
+
+          # Handle DTBO if exists
+          if [[ -f "${objdir}/arch/arm64/boot/dtbo.img" ]]; then
+            cp "${objdir}/arch/arm64/boot/dtbo.img" AnyKernel3/
+          fi
 
       - name: Package flashable ZIP
         run: |
@@ -154,3 +184,9 @@ jobs:
             build.log
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup swap
+        if: always()
+        run: |
+          sudo swapoff /swapfile || true
+          sudo rm -f /swapfile || true
