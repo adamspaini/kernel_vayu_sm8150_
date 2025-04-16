@@ -2,10 +2,6 @@ name: Build GoreKernel for vayu
 
 on:
   workflow_dispatch:
-    inputs:
-      date:
-        description: 'Fecha de compilación (YYYY-MM-DD)'
-        required: true
 
 jobs:
   build:
@@ -19,12 +15,6 @@ jobs:
         ref: fiveteen
         path: kernel
 
-    - name: Clone ZyC Clang toolchain
-      run: git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
-
-    - name: Clone AnyKernel3
-      run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
-
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -34,11 +24,17 @@ jobs:
           gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
           clang zip unzip tar gzip bzip2 cpio jq neofetch \
           libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev \
-          wget make python2.7
+          wget make python3
+
+    - name: Clone ZyC Clang toolchain
+      run: git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
+
+    - name: Clone AnyKernel3
+      run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
     - name: Build kernel and save logs
       run: |
-        set -e
+
         export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
         export CLANG_PATH=$GITHUB_WORKSPACE/clang
         export PATH=$CLANG_PATH/bin:$PATH
@@ -92,7 +88,6 @@ jobs:
           Compilado automáticamente con GitHub Actions.
           - Defconfig: `vayu_defconfig`
           - Toolchain: ZyC Clang
-          - Fecha: ${{ github.event.inputs.date }}
         files: |
           AnyKernel3/GoreKernel_vayu_nonksu.zip
           build.log
