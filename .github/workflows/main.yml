@@ -15,28 +15,34 @@ jobs:
       - name: Cleanup
         run: rm -rf ${{ github.workspace }}/build_output*
 
-      - name: Update system
+      - name: Install dependencies
         run: |
-            sudo apt-get update -y && \
-            sudo apt-get remove -y gcc-multilib && \
-            sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc ccache lld llvm device-tree-compiler nano ca-certificates curl git libc6-dev openssl python3 python3-pip python-is-python3 ssh wget zip zstd make clang software-properties-common libarchive-tools gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu gcc-13-arm-linux-gnueabi g++-13-arm-linux-gnueabi libffi-dev libreadline-dev libbz2-dev libsqlite3-dev pigz cpio neofetch && \
-            sudo apt-get upgrade -y && \
-            neofetch
+          sudo apt-get update -y && \  
+          sudo apt-get remove -y gcc-multilib && \  
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc ccache lld llvm device-tree-compiler nano ca-certificates curl git libc6-dev openssl python3 python3-pip python-is-python3 ssh wget zip zstd make clang software-properties-common libarchive-tools gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu gcc-13-arm-linux-gnueabi g++-13-arm-linux-gnueabi libffi-dev libreadline-dev libbz2-dev libsqlite3-dev pigz cpio neofetch && \  
+          sudo apt-get upgrade -y && \  
+          neofetch  
 
-      - name: Checkout kernel source
-        uses: actions/checkout@v4
-        with:
-          repository: adamspaini/kernel_vayu_sm8150_
-          ref: fiveteen
-          path: kernel
-      
-       
       - name: Setup Swap
         run: |
           sudo fallocate -l 16G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon --priority 10 /swapfile
+
+      - name: Restore ccache cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ github.ref }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ github.ref }}
+            ccache-
+
+      - name: Configure ccache
+        run: |
+          export USE_CCACHE=1
+          ccache -M 10G
 
       - name: Checkout kernel source
         uses: actions/checkout@v4
@@ -61,11 +67,13 @@ jobs:
           export KBUILD_BUILD_USER=arch-linux
           export ARCH=arm64
           export SUBARCH=arm64
+          export USE_CCACHE=1
+          export CCACHE_DIR=~/.ccache
           cd $KERNEL_DIR
 
           make O=out ARCH=arm64 vayu_defconfig
-          make -j$(nproc --all)  O=out ARCH=arm64 \
-              CC=clang \
+          make -j$(nproc) -l$(nproc) O=out ARCH=arm64 \
+              CC="ccache clang" \
               SUBARCH=arm64 \
               DTC_EXT=dtc \
               CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -84,6 +92,12 @@ jobs:
               LLVM_IAS=1 \
               CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
               |& tee ../build.log
+
+      - name: Save ccache cache
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ github.ref }}-${{ github.run_id }}
 
       - name: Check if kernel image exists
         run: |
