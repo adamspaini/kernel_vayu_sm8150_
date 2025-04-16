@@ -6,16 +6,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-  
-       - name: Update system
-         run: |
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Cleanup
+        run: rm -rf ${{ github.workspace }}/build_output*
+
+      - name: Update system
+        run: |
           sudo apt-get update && sudo apt-get upgrade -y
           sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc
 
-         - name: Install required packages
-            run: |
-             sudo apt-get install -y $(cat tools/build/packages.txt)
-
+      - name: Install required packages if present
+        if: ${{ exists('tools/build/packages.txt') }}
+        run: sudo apt-get install -y $(cat tools/build/packages.txt)
 
       - name: Setup Swap
         run: |
@@ -23,13 +30,12 @@ jobs:
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon --priority 10 /swapfile
-    
 
       - name: Checkout kernel source
         uses: actions/checkout@v4
         with:
           repository: adamspaini/kernel_vayu_sm8150_
-          ref: fiveteen
+          ref: fifteen
           path: kernel
 
       - name: Clone ZyC Clang toolchain
@@ -39,8 +45,8 @@ jobs:
         run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
       - name: Build kernel and save logs
+        continue-on-error: true
         run: |
-
           export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
           export CLANG_PATH=$GITHUB_WORKSPACE/clang
           export PATH=$CLANG_PATH/bin:$PATH
@@ -68,20 +74,29 @@ jobs:
               CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
               |& tee ../build.log
 
+      - name: Check if kernel image exists
+        run: |
+          if [ ! -f kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
+            echo "Build failed: kernel image not found."
+            exit 1
+          fi
+
       - name: Move kernel to AnyKernel3
         run: cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
 
       - name: Package flashable ZIP
         run: |
           cd AnyKernel3
-          zip -r9 GoreKernel_vayu_nonksu.zip * -x .git README.md
+          ZIP_NAME="GoreKernel_vayu_nonksu_$(date +'%Y%m%d_%H%M').zip"
+          zip -r9 "$ZIP_NAME" * -x .git README.md
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
       - name: Upload artifacts (ZIP + build log)
         uses: actions/upload-artifact@v4
         with:
           name: GoreKernel_vayu_nonksu
           path: |
-            AnyKernel3/GoreKernel_vayu_nonksu.zip
+            AnyKernel3/${{ env.ZIP_NAME }}
             build.log
 
       - name: Create GitHub Release
@@ -95,7 +110,7 @@ jobs:
             - Toolchain: ZyC Clang
             - Android 15 ready
           files: |
-            AnyKernel3/GoreKernel_vayu_nonksu.zip
+            AnyKernel3/${{ env.ZIP_NAME }}
             build.log
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
