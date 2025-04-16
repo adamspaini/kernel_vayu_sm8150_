@@ -8,7 +8,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout kernel source
+   - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          bc bison flex libssl-dev libncurses5-dev build-essential git curl \
+          ccache lld llvm device-tree-compiler gcc-multilib \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          clang zip unzip tar gzip bzip2 cpio jq neofetch \
+          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev \
+          wget make python3
+
+    - name: Install Python 2.7 using pyenv
+      run: |
+        curl https://pyenv.run | bash
+        echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
+        echo 'eval "$(pyenv init --path)"' >> ~/.bashrc
+        echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+        source ~/.bashrc
+        pyenv install 2.7.18
+        pyenv global 2.7.18
+        python --version
+        which python
+
+
+        - name: Checkout kernel source
       uses: actions/checkout@v4
       with:
         repository: adamspaini/kernel_vayu_sm8150_
@@ -21,34 +45,9 @@ jobs:
     - name: Clone AnyKernel3
       run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          bc bison flex libssl-dev libncurses5-dev build-essential git curl \
-          ccache lld llvm device-tree-compiler gcc-multilib \
-          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-          clang zip unzip tar gzip bzip2 cpio jq neofetch \
-          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev \
-          wget
-
     - name: Build kernel and save logs
       run: |
         set -e
-
-        # Instalar Python 2.7.18 desde fuente
-        wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
-        tar -xf Python-2.7.18.tgz
-        cd Python-2.7.18
-        ./configure --prefix=$HOME/python2
-        make -j$(nproc)
-        make install
-        export PATH="$HOME/python2/bin:$PATH"
-        cd ..
-
-        # Verificar Python 2
-        python --version
-        which python
 
         # Variables y compilación
         export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
