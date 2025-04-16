@@ -2,6 +2,10 @@ name: Build GoreKernel for vayu
 
 on:
   workflow_dispatch:
+    inputs:
+      date:
+        description: 'Fecha de compilación (YYYY-MM-DD)'
+        required: true
 
 jobs:
   build:
@@ -88,7 +92,7 @@ jobs:
           Compilado automáticamente con GitHub Actions.
           - Defconfig: `vayu_defconfig`
           - Toolchain: ZyC Clang
-          - Fecha: ${{ github.event.workflow_dispatch.inputs.date || format('{0:yyyy-MM-dd}', now()) }}
+          - Fecha: ${{ github.event.inputs.date }}
         files: |
           AnyKernel3/GoreKernel_vayu_nonksu.zip
           build.log
