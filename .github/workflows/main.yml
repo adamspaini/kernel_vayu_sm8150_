@@ -20,11 +20,16 @@ jobs:
           sudo apt-get update && sudo apt-get upgrade -y
           sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc
 
+      - name: Checkout kernel source
+        uses: actions/checkout@v4
+        with:
+          repository: adamspaini/kernel_vayu_sm8150_
+          ref: fiveteen
+          path: kernel
       
       - name: Install required debs
         run: bash tools/build/packages.sh
         
-      
         
       - name: Setup Swap
         run: |
