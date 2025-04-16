@@ -66,6 +66,8 @@ jobs:
           make O=out ARCH=arm64 vayu_defconfig
           make -j$(nproc --all)  O=out ARCH=arm64 \
               CC=clang \
+              SUBARCH=arm64 \
+              DTC_EXT=dtc \
               CLANG_TRIPLE=aarch64-linux-gnu- \
               CROSS_COMPILE=aarch64-linux-android- \
               LD=ld.lld \
@@ -74,6 +76,8 @@ jobs:
               STRIP=llvm-strip \
               OBJCOPY=llvm-objcopy \
               OBJDUMP=llvm-objdump \
+              HOSTCC=clang \
+              HOSTCXX=clang++ \
               HOSTAR=llvm-ar \
               HOSTLD=ld.lld \
               LLVM=1 \
