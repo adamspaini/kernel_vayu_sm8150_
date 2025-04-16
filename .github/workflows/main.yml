@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: adamspaini/kernel_vayu_sm8150_
-          ref: fifteen
+          ref: fiveteen
           path: kernel
 
       - name: Clone ZyC Clang toolchain
