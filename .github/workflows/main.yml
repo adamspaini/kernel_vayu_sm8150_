@@ -70,6 +70,13 @@ jobs:
           export USE_CCACHE=1
           export CCACHE_DIR=~/.ccache
           cd $KERNEL_DIR
+          cd ${kernel_dir}
+          cd ${objdir}
+          kernel_dir="${PWD}/kernel"
+          objdir="${kernel_dir}/out"
+          builddir="${kernel_dir}/build"
+          ZIMAGE=$kernel_dir/out/arch/arm64/boot/Image
+          
 
           make O=out ARCH=arm64 vayu_defconfig
           make -j$(nproc) -l$(nproc) O=out ARCH=arm64 \
@@ -101,11 +108,6 @@ jobs:
 
       - name: Check if kernel image exists
         run: |
-          kernel_dir="${PWD}/kernel"
-          objdir="${kernel_dir}/out"
-          ZIMAGE=$kernel_dir/out/arch/arm64/boot/Image
-          cd ${kernel_dir}
-          cd ${objdir}
           
           COMPILED_IMAGE=arch/arm64/boot/Image
           COMPILED_DTBO=arch/arm64/boot/dtbo.img
