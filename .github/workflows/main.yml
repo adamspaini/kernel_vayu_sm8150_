@@ -5,93 +5,93 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-lasted
+    runs-on: ubuntu-latest
 
     steps:
-     - name: Install dependencies
-       run: |
-        sudo apt-get update
-        sudo apt-get install -y 
-          bc bison flex libssl-dev libncurses5-dev build-essential git curl 
-          ccache lld llvm device-tree-compiler gcc-multilib 
-          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu 
-          clang zip unzip tar gzip bzip2 cpio jq neofetch 
-          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev 
-          wget make python3
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc bison build-essential ccache clang cmake curl device-tree-compiler \
+            flex g++-aarch64-linux-gnu gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+            git libelf-dev libssl-dev libtool libz-dev lzop make neofetch \
+            python3 python3-pip rsync unzip wget zip zlib1g-dev \
+            libncurses5-dev libncursesw5-dev lib32ncurses5-dev \
+            lib32z1-dev liblz4-tool libxml2 libxml2-utils xsltproc \
+            lld llvm jq tar gzip bzip2 cpio
 
+      - name: Checkout kernel source
+        uses: actions/checkout@v4
+        with:
+          repository: adamspaini/kernel_vayu_sm8150_
+          ref: fifteen
+          path: kernel
 
-    - name: Checkout kernel source
-       uses: actions/checkout@v4
-       with:
-        repository: adamspaini/kernel_vayu_sm8150_
-        ref: fiveteen
-        path: kernel
+      - name: Clone ZyC Clang toolchain
+        run: git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
 
-    - name: Clone ZyC Clang toolchain
-      run: git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
+      - name: Clone AnyKernel3
+        run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
-    - name: Clone AnyKernel3
-      run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
+      - name: Build kernel and save logs
+        run: |
+          set -e
 
-    - name: Build kernel and save logs
-      run: |
-        set -e
+          export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
+          export CLANG_PATH=$GITHUB_WORKSPACE/clang
+          export PATH=$CLANG_PATH/bin:$PATH
+          export KBUILD_BUILD_HOST=@adams4d13
+          export KBUILD_BUILD_USER=arch-linux
+          export ARCH=arm64
+          export SUBARCH=arm64
+          cd $KERNEL_DIR
 
-        export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
-        export CLANG_PATH=$GITHUB_WORKSPACE/clang
-        export PATH=$CLANG_PATH/bin:$PATH
-        export KBUILD_BUILD_HOST=@adams4d13
-        export KBUILD_BUILD_USER=arch-linux
-        export ARCH=arm64
-        export SUBARCH=arm64
-        cd $KERNEL_DIR
+          make O=out ARCH=arm64 vayu_defconfig
+          make -j$(nproc) O=out ARCH=arm64 \
+              CC=clang \
+              CLANG_TRIPLE=aarch64-linux-gnu- \
+              CROSS_COMPILE=aarch64-linux-android- \
+              LD=ld.lld \
+              AR=llvm-ar \
+              NM=llvm-nm \
+              STRIP=llvm-strip \
+              OBJCOPY=llvm-objcopy \
+              OBJDUMP=llvm-objdump \
+              HOSTAR=llvm-ar \
+              HOSTLD=ld.lld \
+              LLVM=1 \
+              LLVM_IAS=1 \
+              CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
+              |& tee ../build.log
 
-        make O=out ARCH=arm64 vayu_defconfig
-        make -j$(nproc) O=out ARCH=arm64 \
-            CC=clang \
-            CLANG_TRIPLE=aarch64-linux-gnu- \
-            CROSS_COMPILE=aarch64-linux-android- \
-            LD=ld.lld \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            STRIP=llvm-strip \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            HOSTAR=llvm-ar \
-            HOSTLD=ld.lld \
-            LLVM=1 \
-            LLVM_IAS=1 \
-            CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
-            |& tee ../build.log
+      - name: Move kernel to AnyKernel3
+        run: cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
 
-    - name: Move kernel to AnyKernel3
-      run: |
-        cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+      - name: Package flashable ZIP
+        run: |
+          cd AnyKernel3
+          zip -r9 GoreKernel_vayu_nonksu.zip * -x .git README.md
 
-    - name: Package flashable ZIP
-      run: |
-        cd AnyKernel3
-        zip -r9 GoreKernel_vayu_nonksu.zip * -x .git README.md
+      - name: Upload artifacts (ZIP + build log)
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoreKernel_vayu_nonksu
+          path: |
+            AnyKernel3/GoreKernel_vayu_nonksu.zip
+            build.log
 
-    - name: Upload artifacts (ZIP + build log)
-      uses: actions/upload-artifact@v4
-      with:
-        name: GoreKernel_vayu_nonksu
-        path: |
-          AnyKernel3/GoreKernel_vayu_nonksu.zip
-          build.log
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: vayu-${{ github.run_id }}
-        name: GoreKernel vayu - ${{ github.run_id }}
-        body: |
-          Compilado automáticamente con GitHub Actions.
-          - Defconfig: `vayu_defconfig`
-          - Toolchain: ZyC Clang
-        files: |
-          AnyKernel3/GoreKernel_vayu_nonksu.zip
-          build.log
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: vayu-${{ github.run_id }}
+          name: GoreKernel vayu - ${{ github.run_id }}
+          body: |
+            Compilado automáticamente con GitHub Actions.
+            - Defconfig: `vayu_defconfig`
+            - Toolchain: ZyC Clang
+            - Android 15 ready
+          files: |
+            AnyKernel3/GoreKernel_vayu_nonksu.zip
+            build.log
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
