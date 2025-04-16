@@ -18,12 +18,12 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
-          bc bison flex libssl-dev libncurses5-dev build-essential git curl \
-          ccache lld llvm device-tree-compiler gcc-multilib \
-          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-          clang zip unzip tar gzip bzip2 cpio jq neofetch \
-          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev \
+        sudo apt-get install -y 
+          bc bison flex libssl-dev libncurses5-dev build-essential git curl 
+          ccache lld llvm device-tree-compiler gcc-multilib 
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu 
+          clang zip unzip tar gzip bzip2 cpio jq neofetch 
+          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev 
           wget make python3
 
     - name: Clone ZyC Clang toolchain
@@ -34,6 +34,7 @@ jobs:
 
     - name: Build kernel and save logs
       run: |
+        set -e
 
         export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
         export CLANG_PATH=$GITHUB_WORKSPACE/clang
