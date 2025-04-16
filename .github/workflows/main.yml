@@ -1,0 +1,110 @@
+name: Build GoreKernel for vayu
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout kernel source
+      uses: actions/checkout@v4
+      with:
+        repository: adamspaini/kernel_vayu_sm8150_
+        ref: fiveteen
+        path: kernel
+
+    - name: Clone ZyC Clang toolchain
+      run: git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
+
+    - name: Clone AnyKernel3
+      run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          bc bison flex libssl-dev libncurses5-dev build-essential git curl \
+          ccache lld llvm device-tree-compiler gcc-multilib \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          clang zip unzip tar gzip bzip2 cpio jq neofetch \
+          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev \
+          wget make python3
+
+    - name: Install Python 2.7 using pyenv
+      run: |
+        curl https://pyenv.run | bash
+        echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
+        echo 'eval "$(pyenv init --path)"' >> ~/.bashrc
+        echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+        source ~/.bashrc
+        pyenv install 2.7.18
+        pyenv global 2.7.18
+        python --version
+        which python
+
+    - name: Build kernel and save logs
+      run: |
+        set -e
+
+        # Variables y compilación
+        export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
+        export CLANG_PATH=$GITHUB_WORKSPACE/clang
+        export PATH=$CLANG_PATH/bin:$PATH
+        export KBUILD_BUILD_HOST=@adams4d13
+        export KBUILD_BUILD_USER=arch-linux
+        export ARCH=arm64
+        export SUBARCH=arm64
+        cd $KERNEL_DIR
+
+        make O=out ARCH=arm64 vayu_defconfig
+        make -j$(nproc) O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-android- \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            STRIP=llvm-strip \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            HOSTAR=llvm-ar \
+            HOSTLD=ld.lld \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
+            |& tee ../build.log
+
+    - name: Move kernel to AnyKernel3
+      run: |
+        cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+
+    - name: Package flashable ZIP
+      run: |
+        cd AnyKernel3
+        zip -r9 GoreKernel_vayu_nonksu.zip * -x .git README.md
+
+    - name: Upload artifacts (ZIP + build log)
+      uses: actions/upload-artifact@v4
+      with:
+        name: GoreKernel_vayu_nonksu
+        path: |
+          AnyKernel3/GoreKernel_vayu_nonksu.zip
+          build.log
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: vayu-${{ github.run_id }}
+        name: GoreKernel vayu - ${{ github.run_id }}
+        body: |
+          Compilado automáticamente con GitHub Actions.
+          - Defconfig: `vayu_defconfig`
+          - Toolchain: ZyC Clang
+          - Fecha: ${{ github.event.workflow_dispatch.inputs.date || format('{0:yyyy-MM-dd}', now()) }}
+        files: |
+          AnyKernel3/GoreKernel_vayu_nonksu.zip
+          build.log
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
