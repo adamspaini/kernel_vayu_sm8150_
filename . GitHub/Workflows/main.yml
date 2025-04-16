@@ -21,7 +21,7 @@ jobs:
     - name: Clone AnyKernel3
       run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
-    - name: Install dependencies and Python 2.7 with pyenv
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -29,23 +29,28 @@ jobs:
           ccache lld llvm device-tree-compiler gcc-multilib \
           gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
           clang zip unzip tar gzip bzip2 cpio jq neofetch \
-          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev
+          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev \
+          wget
 
-        # Instalar pyenv y Python 2.7
-        curl https://pyenv.run | bash
-        export PATH="$HOME/.pyenv/bin:$PATH"
-        eval "$(pyenv init --path)"
-        eval "$(pyenv init -)"
-        eval "$(pyenv virtualenv-init -)"
-        pyenv install 2.7.18
-        pyenv global 2.7.18
+    - name: Build kernel and save logs
+      run: |
+        set -e
 
-        # Verificación
+        # Instalar Python 2.7.18 desde fuente
+        wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
+        tar -xf Python-2.7.18.tgz
+        cd Python-2.7.18
+        ./configure --prefix=$HOME/python2
+        make -j$(nproc)
+        make install
+        export PATH="$HOME/python2/bin:$PATH"
+        cd ..
+
+        # Verificar Python 2
         python --version
         which python
 
-    - name: Build kernel
-      run: |
+        # Variables y compilación
         export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
         export CLANG_PATH=$GITHUB_WORKSPACE/clang
         export PATH=$CLANG_PATH/bin:$PATH
@@ -54,9 +59,9 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         cd $KERNEL_DIR
+
         make O=out ARCH=arm64 vayu_defconfig
-        make -j$(nproc) 
-        O=out ARCH=arm64 \
+        make -j$(nproc) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
@@ -70,7 +75,8 @@ jobs:
             HOSTLD=ld.lld \
             LLVM=1 \
             LLVM_IAS=1 \
-            CROSS_COMPILE_COMPAT=arm-linux-androideabi-
+            CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
+            |& tee ../build.log
 
     - name: Move kernel to AnyKernel3
       run: |
@@ -81,8 +87,26 @@ jobs:
         cd AnyKernel3
         zip -r9 GoreKernel_vayu_nonksu.zip * -x .git README.md
 
-    - name: Upload ZIP Artifact
+    - name: Upload artifacts (ZIP + build log)
       uses: actions/upload-artifact@v4
       with:
         name: GoreKernel_vayu_nonksu
-        path: AnyKernel3/GoreKernel_vayu_nonksu.zip
+        path: |
+          AnyKernel3/GoreKernel_vayu_nonksu.zip
+          build.log
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: vayu-${{ github.run_id }}
+        name: GoreKernel vayu - ${{ github.run_id }}
+        body: |
+          Compilado automáticamente con GitHub Actions.
+          - Defconfig: `vayu_defconfig`
+          - Toolchain: ZyC Clang
+          - Fecha: ${{ github.event.workflow_dispatch.inputs.date || format('{0:yyyy-MM-dd}', now()) }}
+        files: |
+          AnyKernel3/GoreKernel_vayu_nonksu.zip
+          build.log
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
