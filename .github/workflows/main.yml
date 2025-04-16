@@ -6,8 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-       steps:
+  
        - name: Update system
          run: |
           sudo apt-get update && sudo apt-get upgrade -y
