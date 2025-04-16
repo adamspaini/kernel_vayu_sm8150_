@@ -30,25 +30,11 @@ jobs:
           gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
           clang zip unzip tar gzip bzip2 cpio jq neofetch \
           libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev \
-          wget make python3
-
-    - name: Install Python 2.7 using pyenv
-      run: |
-        curl https://pyenv.run | bash
-        echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
-        echo 'eval "$(pyenv init --path)"' >> ~/.bashrc
-        echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-        source ~/.bashrc
-        pyenv install 2.7.18
-        pyenv global 2.7.18
-        python --version
-        which python
+          wget make python2.7
 
     - name: Build kernel and save logs
       run: |
         set -e
-
-        # Variables y compilación
         export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
         export CLANG_PATH=$GITHUB_WORKSPACE/clang
         export PATH=$CLANG_PATH/bin:$PATH
