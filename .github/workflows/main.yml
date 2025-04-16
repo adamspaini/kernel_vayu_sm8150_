@@ -13,7 +13,8 @@ jobs:
           sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc
 
          - name: Install required packages
-        run: sudo apt-get install -y $(cat tools/build/packages.txt)
+            run: |
+             sudo apt-get install -y $(cat tools/build/packages.txt)
 
 
       - name: Setup Swap
