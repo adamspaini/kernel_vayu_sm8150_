@@ -24,24 +24,31 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y bc bison flex libssl-dev \
-        libncurses5-dev build-essential git curl
-        sudo apt-get update
-        sudo apt install ccache
-        sudo apt-get install lld
-        sudo apt-get install llvm
-        sudo apt install device-tree-compiler
-        sudo apt install gcc-multilib
-        apt update -y && apt upgrade -y && apt install nano bc bison ca-certificates curl flex gcc git libc6-dev libssl-dev openssl python-is-python3 ssh wget zip zstd sudo make clang gcc-arm-linux-gnueabi software-properties-common build-essential libarchive-tools gcc-aarch64-linux-gnu -y && apt install build-essential -y && apt install libssl-dev libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev make gcc -y && apt install pigz -y && apt install python2 -y && apt install python3 -y && apt install cpio -y && apt install lld -y && sudo apt-get install gcc-aarch64-linux-gnu && sudo apt-get install g++-aarch64-linux-gnu && apt install neofetch -y && neofetch
-        sudo apt update -y && sudo apt upgrade -y && sudo apt install nano bc bison ca-certificates curl flex gcc git libc6-dev libssl-dev openssl python-is-python3 ssh wget zip zstd sudo make clang gcc-arm-linux-gnueabi software-properties-common build-essential libarchive-tools gcc-aarch64-linux-gnu -y && sudo apt install build-essential -y && sudo apt install libssl-dev libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev make gcc -y && sudo apt install pigz -y && sudo apt install python2 -y && sudo apt install python3 -y && sudo apt install cpio -y && sudo apt install lld -y
-        sudo apt update && sudo -H apt-get install bc python2 ccache binutils-aarch64-linux-gnu cpio
-        sudo apt-get install -y build-essential bc lld gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libfl-dev
-        sudo apt-get install -y curl git ftp lftp wget libarchive-tools ccache python2 python2-dev
-        sudo apt-get install -y zip unzip tar gzip bzip2 rar unrar cpio jq
-        sudo apt-get install -y build-essential bc lld gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libfl-dev curl git ftp lftp wget libarchive-tools ccache python2 python2-dev zip unzip tar gzip bzip2 rar unrar cpio jq llvm
+        sudo apt-get install -y \
+          bc bison flex libssl-dev libncurses5-dev build-essential git curl \
+          ccache lld llvm device-tree-compiler gcc-multilib \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          clang zip unzip tar gzip bzip2 cpio jq neofetch \
+          libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev \
+          wget make python3
 
-    - name: Build kernel
+    - name: Install Python 2.7 using pyenv
       run: |
+        curl https://pyenv.run | bash
+        echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
+        echo 'eval "$(pyenv init --path)"' >> ~/.bashrc
+        echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+        source ~/.bashrc
+        pyenv install 2.7.18
+        pyenv global 2.7.18
+        python --version
+        which python
+
+    - name: Build kernel and save logs
+      run: |
+        set -e
+
+        # Variables y compilación
         export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
         export CLANG_PATH=$GITHUB_WORKSPACE/clang
         export PATH=$CLANG_PATH/bin:$PATH
@@ -50,9 +57,9 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         cd $KERNEL_DIR
+
         make O=out ARCH=arm64 vayu_defconfig
-        make -j$(nproc) 
-        O=out ARCH=arm64 \
+        make -j$(nproc) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
@@ -62,14 +69,12 @@ jobs:
             STRIP=llvm-strip \
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
-            READELF=llvm-readelf \
-            HOSTCC=clang \
-            HOSTCXX=clang++ \
             HOSTAR=llvm-ar \
             HOSTLD=ld.lld \
             LLVM=1 \
             LLVM_IAS=1 \
-            CROSS_COMPILE_COMPAT=arm-linux-androideabi-
+            CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
+            |& tee ../build.log
 
     - name: Move kernel to AnyKernel3
       run: |
@@ -80,8 +85,26 @@ jobs:
         cd AnyKernel3
         zip -r9 GoreKernel_vayu_nonksu.zip * -x .git README.md
 
-    - name: Upload ZIP Artifact
+    - name: Upload artifacts (ZIP + build log)
       uses: actions/upload-artifact@v4
       with:
         name: GoreKernel_vayu_nonksu
-        path: AnyKernel3/GoreKernel_vayu_nonksu.zip
+        path: |
+          AnyKernel3/GoreKernel_vayu_nonksu.zip
+          build.log
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: vayu-${{ github.run_id }}
+        name: GoreKernel vayu - ${{ github.run_id }}
+        body: |
+          Compilado automáticamente con GitHub Actions.
+          - Defconfig: `vayu_defconfig`
+          - Toolchain: ZyC Clang
+          - Fecha: ${{ github.event.workflow_dispatch.inputs.date || format('{0:yyyy-MM-dd}', now()) }}
+        files: |
+          AnyKernel3/GoreKernel_vayu_nonksu.zip
+          build.log
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
