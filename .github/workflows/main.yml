@@ -8,11 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     
        steps:
-      - name: Cleanup
-        run: rm -rf ${{ github.workspace }}/build_output*
-
-      - name: Update system
-        run: |
+       - name: Update system
+         run: |
           sudo apt-get update && sudo apt-get upgrade -y
           sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc
 
