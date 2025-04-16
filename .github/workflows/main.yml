@@ -6,12 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-       shell: bash
-       working-directory: ${{ github.workspace }}
-
-
+    
        steps:
       - name: Cleanup
         run: rm -rf ${{ github.workspace }}/build_output*
