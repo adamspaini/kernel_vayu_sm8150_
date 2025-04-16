@@ -5,18 +5,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-lasted
 
     steps:
-    - name: Checkout kernel source
-      uses: actions/checkout@v4
-      with:
-        repository: adamspaini/kernel_vayu_sm8150_
-        ref: fiveteen
-        path: kernel
-
-    - name: Install dependencies
-      run: |
+     - name: Install dependencies
+       run: |
         sudo apt-get update
         sudo apt-get install -y 
           bc bison flex libssl-dev libncurses5-dev build-essential git curl 
@@ -25,6 +18,14 @@ jobs:
           clang zip unzip tar gzip bzip2 cpio jq neofetch 
           libffi-dev zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev 
           wget make python3
+
+
+    - name: Checkout kernel source
+       uses: actions/checkout@v4
+       with:
+        repository: adamspaini/kernel_vayu_sm8150_
+        ref: fiveteen
+        path: kernel
 
     - name: Clone ZyC Clang toolchain
       run: git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
