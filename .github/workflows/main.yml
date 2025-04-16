@@ -101,13 +101,27 @@ jobs:
 
       - name: Check if kernel image exists
         run: |
-          if [ ! -f kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
-            echo "Build failed: kernel image not found."
+          kernel_dir="${PWD}/kernel"
+          objdir="${kernel_dir}/out"
+          ZIMAGE=$kernel_dir/out/arch/arm64/boot/Image
+          cd ${kernel_dir}
+          cd ${objdir}
+          
+          COMPILED_IMAGE=arch/arm64/boot/Image
+          COMPILED_DTBO=arch/arm64/boot/dtbo.img
+          
+          if [[ -f ${COMPILED_IMAGE} && -f ${COMPILED_DTBO} ]]; then
+            echo "Kernel and DTBO found, proceeding..."
+          else
+            echo "Build failed: kernel image or DTBO not found."
             exit 1
           fi
 
       - name: Move kernel to AnyKernel3
-        run: cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+        run: |
+          kernel_dir="${PWD}/kernel"
+          cp $kernel_dir/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+          cp $kernel_dir/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
       - name: Package flashable ZIP
         run: |
