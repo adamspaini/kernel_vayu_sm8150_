@@ -23,7 +23,7 @@ export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
 # Crdroid Clang
 if ! [ -d "$CLANG_DIR" ]; then
     echo "Clonando Crdroid Clang..."
-    if ! git clone --depth=1 https://gitlab.com/crdroidandro id/android_prebuilts_clang_host _linux-x86_clang-r536225.git -b 15.0 $CLANG_DIR; then
+    if ! git clone -q --depth=1 --single-branch https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r547379.git -b 15.0 $CLANG_DIR; then
         echo "¡Fallo al clonar Crdroid Clang!"
         exit 1
     fi
