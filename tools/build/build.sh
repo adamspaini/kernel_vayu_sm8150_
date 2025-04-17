@@ -20,11 +20,11 @@ export KBUILD_BUILD_USER=arch-linux
 
 export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
 
-# ZyC Clang 21.0
+# Crdroid Clang
 if ! [ -d "$CLANG_DIR" ]; then
-    echo "Clonando ZyC Clang 21.0..."
-    if ! git clone --depth=1 https://github.com/ZyCromerZ/clang.git -b 19.0.0git-20240306 $CLANG_DIR; then
-        echo "¡Fallo al clonar ZyC Clang 21.0!"
+    echo "Clonando Crdroid Clang..."
+    if ! git clone --depth=1 https://gitlab.com/crdroidandro id/android_prebuilts_clang_host _linux-x86_clang-r536225.git -b 15.0 $CLANG_DIR; then
+        echo "¡Fallo al clonar Crdroid Clang!"
         exit 1
     fi
 fi
@@ -48,8 +48,7 @@ LRD='\033[1;31m'
 LGR='\033[1;32m'
 
 make_defconfig()
-{   
-    START=$(date +"%s")
+{
     echo -e ${LGR} "########### Generando Defconfig ############${NC}"
     make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc --all)
 }
@@ -58,30 +57,29 @@ compile()
 {
     cd ${kernel_dir}
     echo -e ${LGR} "######### Compilando kernel #########${NC}"
-    make -j$(nproc --all) \
-  O=out \
-  ARCH=arm64 \
-  SUBARCH=arm64 \
-  DTC_EXT=dtc \
-  CLANG_TRIPLE=aarch64-linux-gnu- \
-  CROSS_COMPILE=aarch64-linux-gnu- \
-  CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-  CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-  LD=ld.lld \
-  AR=llvm-ar \
-  NM=llvm-nm \
-  STRIP=llvm-strip \
-  OBJCOPY=llvm-objcopy \
-  OBJDUMP=llvm-objdump \
-  READELF=llvm-readelf \
-  HOSTCC=clang \
-  HOSTCXX=clang++ \
-  HOSTAR=llvm-ar \
-  HOSTLD=ld.lld \
-  LLVM=1 \
-  LLVM_IAS=1 \
-  CC="ccache clang" \
-  $1
+    make -j$(nproc) -l$(nproc) \
+    O=out \
+    ARCH=${ARCH} \
+    CC="ccache clang" \
+    SUBARCH=arm64 \  
+    DTC_EXT=dtc \  
+    CLANG_TRIPLE=aarch64-linux-gnu- \ 
+    CROSS_COMPILE=aarch64-linux-gnu- \
+    CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+    CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+    AR=llvm-ar \
+    STRIP=llvm-strip \  
+    OBJCOPY=llvm-objcopy \  
+    OBJDUMP=llvm-objdump \  
+    HOSTCC=clang \  
+    HOSTCXX=clang++ \  
+    HOSTAR=llvm-ar \  
+    HOSTLD=ld.lld \     
+    LLVM_NM=llvm-nm \
+    LD=ld.lld 
+    NM=llvm-nm \
+    LLVM=1 \
+    LLVM_IAS=1
 }
 
 completion()
