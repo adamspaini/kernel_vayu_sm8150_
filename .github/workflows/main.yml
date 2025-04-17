@@ -6,6 +6,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ github.workspace }}
 
     steps:
       - name: Cleanup
@@ -14,23 +18,18 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y \
-            build-essential libncurses-dev bison flex libssl-dev \
-            libelf-dev bc ccache lld llvm device-tree-compiler \
-            git curl zip zstd make clang \
-            gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu \
-            gcc-13-arm-linux-gnueabi g++-13-arm-linux-gnueabi \
-            python3 python3-pip python-is-python3 ca-certificates \
-            libarchive-tools neofetch
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc ccache lld llvm device-tree-compiler nano ca-certificates curl git libc6-dev openssl python3 python3-pip python-is-python3 ssh wget zip zstd make clang software-properties-common libarchive-tools gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu gcc-13-arm-linux-gnueabi g++-13-arm-linux-gnueabi libffi-dev libreadline-dev libbz2-dev libsqlite3-dev pigz cpio neofetch
+          sudo apt-get upgrade -y
+          neofetch
 
-      - name: Setup swap
+      - name: Setup Swap
         run: |
           sudo fallocate -l 16G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon --priority 10 /swapfile
 
-      - name: Restore ccache
+      - name: Restore ccache cache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
@@ -51,15 +50,15 @@ jobs:
           ref: fiveteen
           path: kernel
 
-      - name: Clone ZyC Clang toolchain
-        run: git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
+      - name: Clone crDroid Clang toolchain
+        run: git clone --depth=1 -b 15.0 https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r536225.git clang
 
       - name: Clone AnyKernel3
         run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
-      - name: Build kernel and images
+      - name: Build kernel and save logs
+        continue-on-error: true
         run: |
-          set -x  # Enable debugging
           export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
           export CLANG_PATH=$GITHUB_WORKSPACE/clang
           export PATH=$CLANG_PATH/bin:$PATH
@@ -71,73 +70,80 @@ jobs:
           export CCACHE_DIR=~/.ccache
           cd $KERNEL_DIR
 
-          # Build kernel
           make O=out ARCH=arm64 vayu_defconfig
           make -j$(nproc) O=out ARCH=arm64 \
-            CC="ccache clang" \
-            CLANG_TRIPLE=aarch64-linux-gnu- \
-            CROSS_COMPILE=aarch64-linux-android- \
-            CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
-            LD=ld.lld LLVM=1 LLVM_IAS=1
+              CC="ccache clang" \
+              SUBARCH=arm64 \
+              DTC_EXT=dtc \
+              CLANG_TRIPLE=aarch64-linux-gnu- \
+              CROSS_COMPILE=aarch64-linux-android- \
+              LD=ld.lld \
+              AR=llvm-ar \
+              NM=llvm-nm \
+              STRIP=llvm-strip \
+              OBJCOPY=llvm-objcopy \
+              OBJDUMP=llvm-objdump \
+              HOSTCC=clang \
+              HOSTCXX=clang++ \
+              HOSTAR=llvm-ar \
+              HOSTLD=ld.lld \
+              LLVM=1 \
+              LLVM_IAS=1 \
+              CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
+              2>&1 | tee ../build.log
 
-          # Generate dtb.img
-          find out/arch/arm64/boot/dts -name "*.dtb" -exec cat {} + > out/arch/arm64/boot/dtb.img || exit 1
+          # Build specific images
+          make O=out ARCH=arm64 Image dtb.img dtbo.img \
+              CC="ccache clang" \
+              LD=ld.lld \
+              2>&1 | tee -a ../build.log
 
-          # Prepare dtbo files
-          mkdir -p out/dtbo
-          find out/arch/arm64/boot/dts -name "*.dts" | while read dts; do
-            name=$(basename "$dts" .dts)
-            $KERNEL_DIR/scripts/dtc/dtc -I dts -O dtb -o out/dtbo/$name.dtbo "$dts" || exit 1
-          done
-
-          # Download mkdtimg tools
-          curl -sLO https://android.googlesource.com/platform/system/libufdt/+archive/refs/heads/master.tar.gz
-          mkdir -p tools/libufdt
-          tar xzf master.tar.gz -C tools/libufdt
-          rm master.tar.gz
-
-          # Create dtbo.img.cfg
-          mkdir -p tools/libufdt
-          echo "# dtbo.img layout" > tools/libufdt/dtbo.img.cfg
-          for f in out/dtbo/*.dtbo; do
-            echo "[${f##*/}]" >> tools/libufdt/dtbo.img.cfg
-            echo "filename = $f" >> tools/libufdt/dtbo.img.cfg
-          done
-
-          # Build dtbo.img using python script
-          python3 tools/libufdt/utils/src/mkdtboimg.py create \
-            out/arch/arm64/boot/dtbo.img \
-            --page_size=4096 \
-            out/dtbo/*.dtbo || exit 1
-
-      - name: Save ccache
+      - name: Save ccache cache
         uses: actions/cache/save@v4
         with:
           path: ~/.ccache
           key: ccache-${{ github.ref }}-${{ github.run_id }}
 
+      - name: Check build artifacts
+        run: |
+          kernel_dir="${PWD}/kernel"
+          objdir="${kernel_dir}/out"
+          
+          echo "Checking build artifacts in: ${objdir}/arch/arm64/boot/"
+          ls -la "${objdir}/arch/arm64/boot/"
+
+          for file in Image dtb.img dtbo.img; do
+            if [[ -f "${objdir}/arch/arm64/boot/$file" ]]; then
+              echo "Found $file"
+            else
+              echo "ERROR: $file not found!"
+              exit 1
+            fi
+          done
+
       - name: Prepare AnyKernel3 files
         run: |
-          cd kernel
-          outdir=out/arch/arm64/boot
-          cp $outdir/Image ../AnyKernel3/ || exit 1
-          cp $outdir/dtb.img ../AnyKernel3/ || exit 1
-          cp $outdir/dtbo.img ../AnyKernel3/ || exit 1
+          kernel_dir="${PWD}/kernel"
+          objdir="${kernel_dir}/out/arch/arm64/boot"
+
+          cp "${objdir}/Image" AnyKernel3/
+          cp "${objdir}/dtb.img" AnyKernel3/
+          cp "${objdir}/dtbo.img" AnyKernel3/
 
       - name: Package flashable ZIP
         run: |
           cd AnyKernel3
-          ZIP_NAME="GoreKernel_vayu_$(date +'%Y%m%d_%H%M').zip"
-          zip -r9 "$ZIP_NAME" * -x .git README.md || exit 1
+          ZIP_NAME="GoreKernel_vayu_nonksu_$(date +'%Y%m%d_%H%M').zip"
+          zip -r9 "$ZIP_NAME" * -x .git README.md
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
       - name: Upload artifacts (ZIP + build log)
         uses: actions/upload-artifact@v4
         with:
-          name: GoreKernel_vayu
+          name: GoreKernel_vayu_nonksu
           path: |
             AnyKernel3/${{ env.ZIP_NAME }}
-            kernel/build.log
+            build.log
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -145,13 +151,13 @@ jobs:
           tag_name: vayu-${{ github.run_id }}
           name: GoreKernel vayu - ${{ github.run_id }}
           body: |
-            Kernel compilado automáticamente para vayu.
+            Compilado automáticamente con GitHub Actions.
             - Defconfig: `vayu_defconfig`
-            - Toolchain: ZyC Clang
-            - Archivos incluidos: `Image`, `dtbo.img`, `dtb.img`
+            - Toolchain: crDroid Clang r536225
+            - Android 15 ready
           files: |
             AnyKernel3/${{ env.ZIP_NAME }}
-            kernel/build.log
+            build.log
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
