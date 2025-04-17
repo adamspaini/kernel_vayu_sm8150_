@@ -82,25 +82,23 @@ compile() {
         LLVM_IAS=1
 }
 
-completion() {
+completion()
+{
     cd ${objdir}
     COMPILED_IMAGE=arch/arm64/boot/Image
     COMPILED_DTBO=arch/arm64/boot/dtbo.img
-    COMPILED_DTB=arch/arm64/boot/dtb.img
-    if [[ -f ${COMPILED_IMAGE} ]]; then
-        git clone -q https://github.com/GXC2356/AnyKernel3.git -b master $anykernel
-        # Mover todos los binarios disponibles
-        mv -f $ZIMAGE ${COMPILED_DTBO} ${COMPILED_DTB} $anykernel 2>/dev/null || true
+    if [[ -f ${COMPILED_IMAGE} && ${COMPILED_DTBO} ]]; then
+        git clone -q https://github.com/adamspaini/AnyKernel3.git -b master $anykernel
+        mv -f $ZIMAGE ${COMPILED_DTBO} $anykernel
         cd $anykernel
-        zip -r -9 AnyKernel.zip * > /dev/null
+        zip -r AnyKernel.zip *
         mv AnyKernel.zip $zip_name
         mv $anykernel/$zip_name $HOME/$zip_name
         rm -rf $anykernel
-        echo -e ${LGR} "#### build completed successfully ####"
+        echo -e ${LGR} "#### compilación completada correctamente ####"
         exit 0
     else
-        echo -e ${RED} "#### failed to build some targets ####"
-        exit 1
+        echo -e ${LGR} "####no se pudieron compilar algunos objetivos ####"
     fi
 }
 
