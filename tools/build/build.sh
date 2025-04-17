@@ -80,6 +80,7 @@ compile()
     NM=llvm-nm \
     LLVM=1 \
     LLVM_IAS=1
+    $1
 }
 
 completion()
