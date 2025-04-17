@@ -82,8 +82,7 @@ compile() {
         LLVM_IAS=1
 }
 
-completion()
-{
+completion() {
     cd ${objdir}
     COMPILED_IMAGE=arch/arm64/boot/Image
     COMPILED_DTBO=arch/arm64/boot/dtbo.img
@@ -98,7 +97,8 @@ completion()
         echo -e ${LGR} "#### compilación completada correctamente ####"
         exit 0
     else
-        echo -e ${LGR} "####no se pudieron compilar algunos objetivos ####"
+        echo -e ${RED} "####no se pudieron compilar algunos objetivos ####"
+        exit 1
     fi
 }
 
