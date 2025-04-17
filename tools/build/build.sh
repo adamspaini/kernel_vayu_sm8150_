@@ -49,8 +49,9 @@ LGR='\033[1;32m'
 
 make_defconfig()
 {
+    START=$(date +"%")
     echo -e ${LGR} "########### Generando Defconfig ############${NC}"
-    make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc --all)
+    make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc) -l$(nproc)
 }
 
 compile()
@@ -59,7 +60,7 @@ compile()
     echo -e ${LGR} "######### Compilando kernel #########${NC}"
     make -j$(nproc) -l$(nproc) \
     O=out \
-    ARCH=${ARCH} \
+    ARCH=arm64 \
     CC="ccache clang" \
     SUBARCH=arm64 \  
     DTC_EXT=dtc \  
