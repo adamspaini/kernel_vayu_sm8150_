@@ -21,7 +21,7 @@ jobs:
             gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu \
             gcc-13-arm-linux-gnueabi g++-13-arm-linux-gnueabi \
             python3 python3-pip python-is-python3 ca-certificates \
-            libarchive-tools neofetch
+            libarchive-tools neofetch python2
 
       - name: Setup swap
         run: |
@@ -59,6 +59,7 @@ jobs:
 
       - name: Build kernel and images
         run: |
+          set -x  # Enable debugging
           export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
           export CLANG_PATH=$GITHUB_WORKSPACE/clang
           export PATH=$CLANG_PATH/bin:$PATH
@@ -70,39 +71,44 @@ jobs:
           export CCACHE_DIR=~/.ccache
           cd $KERNEL_DIR
 
+          # Build kernel
           make O=out ARCH=arm64 vayu_defconfig
           make -j$(nproc) O=out ARCH=arm64 \
             CC="ccache clang" \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
-            LD=ld.lld LLVM=1 LLVM_IAS=1 DTC_EXT=dtc
+            LD=ld.lld LLVM=1 LLVM_IAS=1
 
           # Generate dtb.img
-          find out/arch/arm64/boot/dts -name "*.dtb" -exec cat {} + > out/arch/arm64/boot/dtb.img
+          find out/arch/arm64/boot/dts -name "*.dtb" -exec cat {} + > out/arch/arm64/boot/dtb.img || exit 1
 
-          # Compile .dtbo files
+          # Prepare dtbo files
           mkdir -p out/dtbo
           find out/arch/arm64/boot/dts -name "*.dts" | while read dts; do
             name=$(basename "$dts" .dts)
-            dtc -I dts -O dtb -o out/dtbo/$name.dtbo "$dts"
+            $KERNEL_DIR/scripts/dtc/dtc -I dts -O dtb -o out/dtbo/$name.dtbo "$dts" || exit 1
           done
 
-          # Clone and build mkdtimg tool
-          git clone https://android.googlesource.com/platform/system/libufdt tools/libufdt
-          cd tools/libufdt && make dtc mkdtimg -j$(nproc) && cd ../..
+          # Download mkdtimg tools
+          curl -sLO https://android.googlesource.com/platform/system/libufdt/+archive/refs/heads/master.tar.gz
+          mkdir -p tools/libufdt
+          tar xzf master.tar.gz -C tools/libufdt
+          rm master.tar.gz
 
           # Create dtbo.img.cfg
+          mkdir -p tools/libufdt
           echo "# dtbo.img layout" > tools/libufdt/dtbo.img.cfg
           for f in out/dtbo/*.dtbo; do
             echo "[${f##*/}]" >> tools/libufdt/dtbo.img.cfg
             echo "filename = $f" >> tools/libufdt/dtbo.img.cfg
           done
 
-          # Pack dtbo.img
-          tools/libufdt/mkdtimg cfg_create \
+          # Build dtbo.img using python script
+          python2 tools/libufdt/utils/src/mkdtboimg.py create \
             out/arch/arm64/boot/dtbo.img \
-            tools/libufdt/dtbo.img.cfg
+            --page_size=4096 \
+            out/dtbo/*.dtbo || exit 1
 
       - name: Save ccache
         uses: actions/cache/save@v4
@@ -114,15 +120,15 @@ jobs:
         run: |
           cd kernel
           outdir=out/arch/arm64/boot
-          cp $outdir/Image ../AnyKernel3/
-          cp $outdir/dtb.img ../AnyKernel3/
-          cp $outdir/dtbo.img ../AnyKernel3/
+          cp $outdir/Image ../AnyKernel3/ || exit 1
+          cp $outdir/dtb.img ../AnyKernel3/ || exit 1
+          cp $outdir/dtbo.img ../AnyKernel3/ || exit 1
 
       - name: Package flashable ZIP
         run: |
           cd AnyKernel3
           ZIP_NAME="GoreKernel_vayu_$(date +'%Y%m%d_%H%M').zip"
-          zip -r9 "$ZIP_NAME" * -x .git README.md
+          zip -r9 "$ZIP_NAME" * -x .git README.md || exit 1
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
       - name: Upload artifacts (ZIP + build log)
