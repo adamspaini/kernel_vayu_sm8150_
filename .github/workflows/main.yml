@@ -12,7 +12,7 @@ jobs:
         working-directory: ${{ github.workspace }}
 
     steps:
-      - name: Cleanup
+      - name: Cleanup workspace
         run: rm -rf ${{ github.workspace }}/build_output*
 
       - name: Install dependencies
@@ -23,7 +23,7 @@ jobs:
           sudo apt-get upgrade -y
           neofetch
 
-      - name: Setup Swap
+      - name: Setup Swap (16GB)
         run: |
           sudo fallocate -l 16G /swapfile
           sudo chmod 600 /swapfile
@@ -43,6 +43,7 @@ jobs:
         run: |
           export USE_CCACHE=1
           ccache -M 10G
+          ccache -s
 
       - name: Checkout kernel source
         uses: actions/checkout@v4
@@ -57,10 +58,33 @@ jobs:
       - name: Clone AnyKernel3
         run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
-      - name: Setup mkdtboimg.py
+      - name: Setup mkdtboimg.py (3 fuentes alternativas)
         run: |
-          wget https://raw.githubusercontent.com/LineageOS/android_system_tools_mkdtboimg/master/mkdtboimg.py -O kernel/scripts/dtc/mkdtboimg.py
+          echo "⚙️ Intentando descargar mkdtboimg.py desde fuentes alternativas..."
+          
+          # Fuente 1: LineageOS (primera opción)
+          if wget https://raw.githubusercontent.com/LineageOS/android_system_tools_mkdtboimg/master/mkdtboimg.py -O kernel/scripts/dtc/mkdtboimg.py; then
+            echo "✅ Descargado desde LineageOS"
+          else
+            # Fuente 2: AOSP (Google)
+            echo "⚠️ Falló LineageOS, intentando AOSP..."
+            if wget https://raw.githubusercontent.com/android/platform_system_tools_mkdtboimg/main/mkdtboimg.py -O kernel/scripts/dtc/mkdtboimg.py; then
+              echo "✅ Descargado desde AOSP"
+            else
+              # Fuente 3: Repositorio espejo
+              echo "⚠️ Falló AOSP, intentando repositorio espejo..."
+              if wget https://raw.githubusercontent.com/kdrag0n/proton-clang-build/master/mkdtboimg.py -O kernel/scripts/dtc/mkdtboimg.py; then
+                echo "✅ Descargado desde repositorio espejo"
+              else
+                echo "::error::❌ Todas las fuentes fallaron para descargar mkdtboimg.py"
+                exit 1
+              fi
+            fi
+          fi
+          
           chmod +x kernel/scripts/dtc/mkdtboimg.py
+          echo "🔍 Verificando archivo..."
+          ls -la kernel/scripts/dtc/mkdtboimg.py || exit 1
 
       - name: Build kernel
         run: |
@@ -71,8 +95,10 @@ jobs:
           export SUBARCH=arm64
           cd $KERNEL_DIR
 
+          echo "⚙️ Configurando compilación..."
           make O=out ARCH=arm64 vayu_defconfig
 
+          echo "🏗️ Compilando kernel..."
           make -j$(nproc) O=out ARCH=arm64 \
             CC="ccache clang" \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -85,54 +111,58 @@ jobs:
       - name: Generar dtbo.img
         run: |
           cd kernel
+          echo "📦 Generando dtbo.img..."
           find out/arch/arm64/boot/dts -name '*.dtbo' > dtbo_list.txt
           if [[ -s dtbo_list.txt ]]; then
-            python3 scripts/dtc/mkdtboimg.py create out/arch/arm64/boot/dtbo.img dtbo_list.txt
-            echo "dtbo.img generado exitosamente."
+            python3 scripts/dtc/mkdtboimg.py create out/arch/arm64/boot/dtbo.img @dtbo_list.txt
+            echo "✅ dtbo.img generado exitosamente."
           else
-            echo "ERROR: No se encontraron archivos .dtbo para generar dtbo.img"
+            echo "::error::❌ No se encontraron archivos .dtbo"
             exit 1
           fi
 
       - name: Crear dtb.img
         run: |
           cd kernel
+          echo "📦 Creando dtb.img..."
           dtb_dir="out/arch/arm64/boot/dts"
           dtb_files=$(find "$dtb_dir" -name '*.dtb')
           if [[ -n "$dtb_files" ]]; then
             cat $dtb_files > out/arch/arm64/boot/dtb.img
-            echo "dtb.img creado exitosamente."
+            echo "✅ dtb.img creado exitosamente."
           else
-            echo "ERROR: No se encontraron archivos .dtb para crear dtb.img"
+            echo "::error::❌ No se encontraron archivos .dtb"
             exit 1
           fi
 
       - name: Verificar artefactos
         run: |
+          echo "🔍 Verificando artefactos generados..."
           ls -la kernel/out/arch/arm64/boot/
-          [[ -f kernel/out/arch/arm64/boot/Image ]] || { echo "ERROR: Image no encontrado"; exit 1; }
-          [[ -f kernel/out/arch/arm64/boot/dtbo.img ]] || { echo "ERROR: dtbo.img no generado"; exit 1; }
-          [[ -f kernel/out/arch/arm64/boot/dtb.img ]] || { echo "ERROR: dtb.img no generado"; exit 1; }
+          [[ -f kernel/out/arch/arm64/boot/Image ]] || { echo "::error::❌ Image no encontrado"; exit 1; }
+          [[ -f kernel/out/arch/arm64/boot/dtbo.img ]] || { echo "::error::❌ dtbo.img no generado"; exit 1; }
+          [[ -f kernel/out/arch/arm64/boot/dtb.img ]] || { echo "::error::❌ dtb.img no generado"; exit 1; }
 
       - name: Copiar archivos a AnyKernel3
         run: |
-          cp kernel/out/arch/arm64/boot/Image AnyKernel3/
-          cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
-          cp kernel/out/arch/arm64/boot/dtb.img AnyKernel3/
+          echo "📂 Copiando archivos a AnyKernel3..."
+          cp -v kernel/out/arch/arm64/boot/Image AnyKernel3/
+          cp -v kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
+          cp -v kernel/out/arch/arm64/boot/dtb.img AnyKernel3/
 
       - name: Crear ZIP flashable
         run: |
           cd AnyKernel3
           ZIP_NAME="GoreKernel_vayu_nonksu_$(date +'%Y%m%d_%H%M').zip"
+          echo "📦 Creando ZIP: $ZIP_NAME"
           zip -r9 "$ZIP_NAME" * -x .git README.md
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
-      - name: Upload artifacts (ZIP + build log)
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: GoreKernel_vayu_nonksu
-          path: |
-            AnyKernel3/${{ env.ZIP_NAME }}
+          path: AnyKernel3/${{ env.ZIP_NAME }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -144,13 +174,13 @@ jobs:
             - Defconfig: `vayu_defconfig`
             - Toolchain: ZyC Clang
             - Archivos generados: `Image`, `dtbo.img`, `dtb.img`
-          files: |
-            AnyKernel3/${{ env.ZIP_NAME }}
+          files: AnyKernel3/${{ env.ZIP_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup swap
         if: always()
         run: |
+          echo "🧹 Limpiando swap..."
           sudo swapoff /swapfile || true
           sudo rm -f /swapfile || true
