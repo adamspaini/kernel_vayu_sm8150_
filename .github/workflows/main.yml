@@ -12,32 +12,20 @@ jobs:
         working-directory: ${{ github.workspace }}
 
     steps:
-      - name: Cleanup
+      - name: Cleanup workspace
         run: rm -rf ${{ github.workspace }}/build_output*
 
       - name: Install dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get remove -y gcc-multilib
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc ccache lld llvm device-tree-compiler nano ca-certificates curl git libc6-dev openssl python3 python3-pip python-is-python3 ssh wget zip zstd make clang software-properties-common libarchive-tools gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu gcc-13-arm-linux-gnueabi g++-13-arm-linux-gnueabi libffi-dev libreadline-dev libbz2-dev libsqlite3-dev pigz cpio neofetch
-          sudo apt-get upgrade -y
-          neofetch
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc ccache lld llvm device-tree-compiler git wget zip python3 make clang gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: Setup Swap
+      - name: Setup Swap (16GB)
         run: |
           sudo fallocate -l 16G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
-          sudo swapon --priority 10 /swapfile
-
-      - name: Restore ccache cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.ccache
-          key: ccache-${{ github.ref }}-${{ github.run_id }}
-          restore-keys: |
-            ccache-${{ github.ref }}
-            ccache-
+          sudo swapon /swapfile
 
       - name: Configure ccache
         run: |
@@ -51,143 +39,66 @@ jobs:
           ref: fiveteen
           path: kernel
 
-      - name: Clone ZyC Clang toolchain
-        run: git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
-
-      - name: Clone AnyKernel3
-        run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
+      - name: Clone toolchains
+        run: |
+          git clone --depth=1 https://github.com/ZyCromerZ/Clang clang
+          git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
       - name: Build kernel
-        continue-on-error: true
         run: |
           export KERNEL_DIR=$GITHUB_WORKSPACE/kernel
           export CLANG_PATH=$GITHUB_WORKSPACE/clang
           export PATH=$CLANG_PATH/bin:$PATH
-          export KBUILD_BUILD_HOST=@adams4d13
-          export KBUILD_BUILD_USER=arch-linux
           export ARCH=arm64
           export SUBARCH=arm64
-          export USE_CCACHE=1
-          export CCACHE_DIR=~/.ccache
+          
           cd $KERNEL_DIR
-
-          # Build kernel and device tree
+          
+          # Build configuration
           make O=out ARCH=arm64 vayu_defconfig
-          make -j$(nproc) -l$(nproc) O=out ARCH=arm64 \
+          
+          # Build kernel and device trees (CORREGIDO: dtbo.img en lugar de dibo.img)
+          make -j$(nproc) O=out ARCH=arm64 \
               CC="ccache clang" \
+              CROSS_COMPILE=aarch64-linux-gnu- \
               LD=ld.lld \
-              AR=llvm-ar \
-              NM=llvm-nm \
-              STRIP=llvm-strip \
-              OBJCOPY=llvm-objcopy \
-              OBJDUMP=llvm-objdump \
-              CLANG_TRIPLE=aarch64-linux-gnu- \
-              CROSS_COMPILE=aarch64-linux-android- \
-              CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
               LLVM=1 \
               LLVM_IAS=1 \
-              Image dtbo.img dtbs \
-              2>&1 | tee ../build.log
+              Image dtbo.img dtbs 2>&1 | tee build.log
 
-          # Generate dtb.img from compiled dtbs
-          cd out/arch/arm64/boot
-          find dts -name '*.dtb' -exec cat {} + > dtb.img
-          cd ../../../..
-
-      - name: Save ccache cache
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.ccache
-          key: ccache-${{ github.ref }}-${{ github.run_id }}
-
-      - name: Verify artifacts
-        run: |
-          kernel_dir="${PWD}/kernel"
-          boot_dir="${kernel_dir}/out/arch/arm64/boot"
-          
-          echo "Checking build artifacts:"
-          ls -la "${boot_dir}"
-          
-          if [[ ! -f "${boot_dir}/Image" ]]; then
-            echo "Error: Image not found!"
-            exit 1
-          fi
-          
-          if [[ ! -f "${boot_dir}/dtb.img" ]]; then
-            echo "Error: dtb.img not found!"
-            exit 1
-          fi
+          # Verify outputs
+          ls -la out/arch/arm64/boot/
 
       - name: Prepare AnyKernel3 package
         run: |
-          kernel_dir="${PWD}/kernel"
-          boot_dir="${kernel_dir}/out/arch/arm64/boot"
+          KERNEL_DIR=$GITHUB_WORKSPACE/kernel
+          ANY_KERNEL_DIR=$GITHUB_WORKSPACE/AnyKernel3
           
           # Copy required files
-          cp "${boot_dir}/Image" AnyKernel3/
-          cp "${boot_dir}/dtb.img" AnyKernel3/
+          cp $KERNEL_DIR/out/arch/arm64/boot/Image $ANY_KERNEL_DIR/
+          cp $KERNEL_DIR/out/arch/arm64/boot/dtbo.img $ANY_KERNEL_DIR/
           
-          # Copy dtbo.img if exists
-          if [[ -f "${boot_dir}/dtbo.img" ]]; then
-            cp "${boot_dir}/dtbo.img" AnyKernel3/
-          fi
-          
-          # Create simple anykernel script
-          cat > AnyKernel3/anykernel.sh << 'EOL'
-          #!/bin/bash
-          
-          kernel.string=GoreKernel
-          do.devicecheck=1
-          do.modules=0
-          do.cleanup=1
-          do.cleanuponabort=0
-          device.name1=vayu
-          device.name2=bhima
-          
-          block=/dev/block/bootdevice/by-name/boot;
-          is_slot_device=0;
-          
-          . tools/ak3-core.sh;
-          
-          dump_boot;
-          write_boot;
-          EOL
-          
-          chmod +x AnyKernel3/anykernel.sh
+          # Combine dtbs into single dtb.img
+          find $KERNEL_DIR/out/arch/arm64/boot/dts/vendor -name '*.dtb' -exec cat {} + > $ANY_KERNEL_DIR/dtb.img
 
-      - name: Create flashable ZIP
-        run: |
-          cd AnyKernel3
-          ZIP_NAME="GoreKernel_vayu_$(date +'%Y%m%d_%H%M').zip"
-          zip -r9 "${ZIP_NAME}" * -x .git README.md
-          echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
+          # Create ZIP
+          cd $ANY_KERNEL_DIR
+          zip -r9 GoreKernel-vayu-$(date +"%Y%m%d-%H%M").zip * -x .git README.md
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: GoreKernel_vayu
-          path: |
-            AnyKernel3/${{ env.ZIP_NAME }}
-            build.log
+          name: GoreKernel-Package
+          path: AnyKernel3/*.zip
 
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: vayu-${{ github.run_id }}
-          name: GoreKernel vayu - ${{ github.run_id }}
-          body: |
-            Built with GitHub Actions
-            - Defconfig: vayu_defconfig
-            - Toolchain: ZyC Clang
-            - Kernel Image + DTB format
-          files: |
-            AnyKernel3/${{ env.ZIP_NAME }}
-            build.log
+          files: AnyKernel3/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cleanup swap
-        if: always()
+      - name: Cleanup
         run: |
           sudo swapoff /swapfile || true
           sudo rm -f /swapfile || true
