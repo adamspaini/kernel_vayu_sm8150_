@@ -18,6 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -y
+          sudo apt-get remove -y gcc-multilib
           sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc ccache lld llvm device-tree-compiler nano ca-certificates curl git libc6-dev openssl python3 python3-pip python-is-python3 ssh wget zip zstd make clang software-properties-common libarchive-tools gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu gcc-13-arm-linux-gnueabi g++-13-arm-linux-gnueabi libffi-dev libreadline-dev libbz2-dev libsqlite3-dev pigz cpio neofetch
           sudo apt-get upgrade -y
           neofetch
@@ -51,7 +52,10 @@ jobs:
           path: kernel
 
       - name: Clone crDroid Clang toolchain
-        run: git clone --depth=1 -b 15.0 https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r536225.git clang
+        run: |
+          git clone --depth=1 https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r536225.git clang
+          cd clang
+          git checkout 15.0
 
       - name: Clone AnyKernel3
         run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
@@ -71,7 +75,7 @@ jobs:
           cd $KERNEL_DIR
 
           make O=out ARCH=arm64 vayu_defconfig
-          make -j$(nproc) O=out ARCH=arm64 \
+          make -j$(nproc) -l$(nproc) O=out ARCH=arm64 \
               CC="ccache clang" \
               SUBARCH=arm64 \
               DTC_EXT=dtc \
@@ -92,8 +96,8 @@ jobs:
               CROSS_COMPILE_COMPAT=arm-linux-androideabi- \
               2>&1 | tee ../build.log
 
-          # Build specific images
-          make O=out ARCH=arm64 Image dtb.img dtbo.img \
+          # Explicitly build required images
+          make O=out ARCH=arm64 Image dtbo.img dtb.img \
               CC="ccache clang" \
               LD=ld.lld \
               2>&1 | tee -a ../build.log
@@ -110,25 +114,49 @@ jobs:
           objdir="${kernel_dir}/out"
           
           echo "Checking build artifacts in: ${objdir}/arch/arm64/boot/"
-          ls -la "${objdir}/arch/arm64/boot/"
+          ls -la "${objdir}/arch/arm64/boot/" || true
+          
+          # Check for kernel image
+          if [[ -f "${objdir}/arch/arm64/boot/Image" ]]; then
+            echo "Found Image"
+          else
+            echo "ERROR: No kernel image found!"
+            exit 1
+          fi
 
-          for file in Image dtb.img dtbo.img; do
-            if [[ -f "${objdir}/arch/arm64/boot/$file" ]]; then
-              echo "Found $file"
-            else
-              echo "ERROR: $file not found!"
-              exit 1
-            fi
-          done
+          # Check for DTBO
+          if [[ -f "${objdir}/arch/arm64/boot/dtbo.img" ]]; then
+            echo "Found dtbo.img"
+          else
+            echo "ERROR: dtbo.img not found!"
+            exit 1
+          fi
+
+          # Check for DTB
+          if [[ -f "${objdir}/arch/arm64/boot/dtb.img" ]]; then
+            echo "Found dtb.img"
+          else
+            echo "ERROR: dtb.img not found!"
+            exit 1
+          fi
 
       - name: Prepare AnyKernel3 files
         run: |
           kernel_dir="${PWD}/kernel"
-          objdir="${kernel_dir}/out/arch/arm64/boot"
+          objdir="${kernel_dir}/out"
+          
+          # Copy kernel image
+          cp "${objdir}/arch/arm64/boot/Image" AnyKernel3/
+          
+          # Copy DTBO
+          cp "${objdir}/arch/arm64/boot/dtbo.img" AnyKernel3/
+          
+          # Copy DTB
+          cp "${objdir}/arch/arm64/boot/dtb.img" AnyKernel3/
 
-          cp "${objdir}/Image" AnyKernel3/
-          cp "${objdir}/dtb.img" AnyKernel3/
-          cp "${objdir}/dtbo.img" AnyKernel3/
+          # Create Image.gz-dtb for compatibility
+          gzip -nc9 "${objdir}/arch/arm64/boot/Image" > AnyKernel3/Image.gz
+          cat AnyKernel3/Image.gz "${objdir}/arch/arm64/boot/dtb.img" > AnyKernel3/Image.gz-dtb
 
       - name: Package flashable ZIP
         run: |
