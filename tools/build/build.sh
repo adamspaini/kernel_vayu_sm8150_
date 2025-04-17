@@ -4,6 +4,7 @@
 kernel_dir="${PWD}"
 CCACHE=$(command -v ccache)
 objdir="${kernel_dir}/out"
+output_dir="${kernel_dir}/output"
 anykernel=$HOME/anykernel
 builddir="${kernel_dir}/build"
 ZIMAGE=$kernel_dir/out/arch/arm64/boot/Image
@@ -86,18 +87,19 @@ completion() {
     cd ${objdir}
     COMPILED_IMAGE=arch/arm64/boot/Image
     COMPILED_DTBO=arch/arm64/boot/dtbo.img
+    mkdir -p "$output_dir"
     if [[ -f ${COMPILED_IMAGE} && ${COMPILED_DTBO} ]]; then
         git clone -q https://github.com/adamspaini/AnyKernel3.git -b master $anykernel
         mv -f $ZIMAGE ${COMPILED_DTBO} $anykernel
         cd $anykernel
         zip -r AnyKernel.zip *
         mv AnyKernel.zip $zip_name
-        mv $anykernel/$zip_name $HOME/$zip_name
+        mv "$zip_name" "$output_dir/"
         rm -rf $anykernel
         echo -e ${LGR} "#### compilación completada correctamente ####"
         exit 0
     else
-        echo -e ${RED} "####no se pudieron compilar algunos objetivos ####"
+        echo -e ${RED} "#### no se pudieron compilar algunos objetivos ####"
         exit 1
     fi
 }
