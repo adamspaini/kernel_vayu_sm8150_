@@ -57,10 +57,10 @@ jobs:
       - name: Clone AnyKernel3
         run: git clone --depth=1 -b master https://github.com/GXC2356/AnyKernel3.git
 
-      - name: Clonar mkdtboimg.py
+      - name: Setup mkdtboimg.py
         run: |
-          git clone --depth=1 https://github.com/phhusson/device_phh_treble treble_tools
-          cp treble_tools/mkdtboimg.py kernel/scripts/dtc/
+          wget https://raw.githubusercontent.com/LineageOS/android_system_tools_mkdtboimg/master/mkdtboimg.py -O kernel/scripts/dtc/mkdtboimg.py
+          chmod +x kernel/scripts/dtc/mkdtboimg.py
 
       - name: Build kernel
         run: |
