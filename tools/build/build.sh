@@ -6,7 +6,7 @@ kernel_dir="${PWD}"
 CCACHE=$(command -v ccache)
 objdir="${kernel_dir}/out"
 output_dir="${kernel_dir}/output"
-anykernel=$HOME/anykernel
+anykernel="tc/anykernel"
 builddir="${kernel_dir}/build"
 kernel_name="GoreKernel_Vayu_nonksu"
 zip_name="$kernel_name$(date +"%Y%m%d").zip"
@@ -112,26 +112,21 @@ restore() {
 }
 
 sdk() {
-    echo -e "${LYW}######### Generando imágenes para SDK #########${NC}"
     
-    if [ -f "$MKDTBOIMG" ]; then
-        python3 "$MKDTBOIMG" create "$anykernel/dtbo.img" --page_size=4096 "$objdir"/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo
-        find "$objdir"/arch/arm64/boot/dts/qcom -name 'sm8150-v2*.dtb' -exec cat {} + > "$anykernel/dtb"
-        python3 "$MKDTBOIMG" create "$anykernel/dtbo-miui.img" --page_size=4096 "$objdir"/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo
-    else
-        echo -e "${RED}Error: No se encontró mkdtboimg.py para generar imágenes SDK${NC}"
-        exit 1
-    fi
+    python3 $MKDTBOIMG create $anykernel/dtbo.img --page_size=4096 " $objdir"/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo
+	find "$objdir"/arch/arm64/boot/dts/qcom -name 'sm8150-v2*.dtb' -exec cat {} + > $anykernel/dtb
+	python3 $MKDTBOIMG create $anykernel/dtbo-miui.img --page_size=4096 "$objdir"/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo
 }
 
 completion() {
-    echo -e "${LGR}#### Verificando archivos compilados ####${NC}"
-    if [[ -f "${ZIMAGE}" && -f "${DTBO_IMG}" ]]; then
+
+     cd ${objdir}
+    if [[ -f "${ZIMAGE}" && "${DTBO_IMG}" ]]; then
         echo -e "${LGR}############################################"
         echo -e "${LGR}############# OkThisIsEpic!  ##############"
         echo -e "${LGR}############################################${NC}"
 
-        git clone -q https://github.com/adamspaini/AnyKernel3.git -b master $anykernel || {
+        git clone -q https://github.com/adamspaini/AnyKernel3.git -b master tc/anykernel $anykernel || {
             echo -e "${LYW}AnyKernel ya existe, actualizando...${NC}"
             cd $anykernel && git pull -q
             cd $kernel_dir
