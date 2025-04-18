@@ -7,7 +7,6 @@ objdir="${kernel_dir}/out"
 output_dir="${kernel_dir}/output"
 anykernel=$HOME/anykernel
 builddir="${kernel_dir}/build"
-ZIMAGE=$kernel_dir/out/arch/arm64/boot/Image
 kernel_name="GoreKernel_Vayu_nonksu"
 zip_name="$kernel_name$(date +"%Y%m%d").zip"
 CLANG_DIR=tc/clang
@@ -17,6 +16,10 @@ export CONFIG_FILE="vayu_defconfig"
 export ARCH="arm64"
 export KBUILD_BUILD_HOST=@adams4d13
 export KBUILD_BUILD_USER=arch-linux
+
+# Archivos importantes (usar rutas absolutas)
+ZIMAGE="${objdir}/arch/arm64/boot/Image"
+DTBO_IMG="${objdir}/arch/arm64/boot/dtbo.img"
 
 export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
 
@@ -84,22 +87,29 @@ compile() {
 }
 
 completion() {
-    cd ${objdir}
-    COMPILED_IMAGE=arch/arm64/boot/Image
-    COMPILED_DTBO=arch/arm64/boot/dtbo.img
-    mkdir -p "$output_dir"
-    if [[ -f ${COMPILED_IMAGE} && ${COMPILED_DTBO} ]]; then
+    echo -e ${LGR} "#### Verificando archivos compilados ####${NC}"
+    if [[ -f "${ZIMAGE}" && -f "${DTBO_IMG}" ]]; then
+        echo -e "${LGR}Archivos encontrados:${NC}"
+        echo -e "${LGR} - ${ZIMAGE}${NC}"
+        echo -e "${LGR} - ${DTBO_IMG}${NC}"
+        
         git clone -q https://github.com/adamspaini/AnyKernel3.git -b master $anykernel
-        mv -f $ZIMAGE ${COMPILED_DTBO} $anykernel
-        cd $anykernel
+        
+        echo -e "${LGR}Copiando archivos a AnyKernel...${NC}"
+        cp -v "${ZIMAGE}" "${DTBO_IMG}" "$anykernel/"
+        
+        cd "$anykernel"
         zip -r AnyKernel.zip *
-        mv AnyKernel.zip $zip_name
-        mv "$zip_name" "$output_dir/"
-        rm -rf $anykernel
-        echo -e ${LGR} "#### compilación completada correctamente ####"
+        
+        mkdir -p "$output_dir"
+        mv -v AnyKernel.zip "$output_dir/${zip_name}"
+        
+        echo -e "${LGR}#### Archivo ZIP creado en: $output_dir/${zip_name} ####${NC}"
         exit 0
     else
-        echo -e ${RED} "#### no se pudieron compilar algunos objetivos ####"
+        echo -e "${RED}#### Archivos no encontrados: ####${NC}"
+        [[ -f "${ZIMAGE}" ]] || echo -e "${RED} - Falta: ${ZIMAGE}${NC}"
+        [[ -f "${DTBO_IMG}" ]] || echo -e "${RED} - Falta: ${DTBO_IMG}${NC}"
         exit 1
     fi
 }
@@ -107,5 +117,5 @@ completion() {
 # Ejecución principal
 clone_tools
 make_defconfig
-compile | tee out/log.txt
+compile | tee "${objdir}/log.txt"
 completion
