@@ -17,7 +17,7 @@ export ARCH="arm64"
 export KBUILD_BUILD_HOST=@adams4d13
 export KBUILD_BUILD_USER=arch-linux
 
-# Archivos importantes (usar rutas absolutas)
+# Archivos importantes
 ZIMAGE="${objdir}/arch/arm64/boot/Image"
 DTBO_IMG="${objdir}/arch/arm64/boot/dtbo.img"
 
@@ -28,7 +28,7 @@ echo "Liberando espacio en el runner..."
 sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache || true
 df -h
 
-# Clonar herramientas
+# Clonar toolchains si no existen
 clone_tools() {
     if ! [ -d "$CLANG_DIR" ]; then
         echo "Clonando Crdroid Clang..."
@@ -53,13 +53,11 @@ LRD='\033[1;31m'
 LGR='\033[1;32m'
 
 make_defconfig() {
-    START=$(date +"%s")
     echo -e ${LGR} "########### Generando Defconfig ############${NC}"
     make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc) -l$(nproc)
 }
 
 compile() {
-    cd ${kernel_dir}
     echo -e ${LGR} "######### Compilando kernel #########${NC}"
     make -j$(nproc) -l$(nproc) \
         O=out \
@@ -86,24 +84,32 @@ compile() {
         LLVM_IAS=1
 }
 
+build_dtbo() {
+    echo -e ${LGR}"######### Compilando dtbo.img #########${NC}"
+    make -j$(nproc) -l$(nproc) \
+        O=out \
+        ARCH=arm64 \
+        dtbo.img
+}
+
 completion() {
     echo -e ${LGR} "#### Verificando archivos compilados ####${NC}"
     if [[ -f "${ZIMAGE}" && -f "${DTBO_IMG}" ]]; then
         echo -e "${LGR}Archivos encontrados:${NC}"
         echo -e "${LGR} - ${ZIMAGE}${NC}"
         echo -e "${LGR} - ${DTBO_IMG}${NC}"
-        
+
         git clone -q https://github.com/adamspaini/AnyKernel3.git -b master $anykernel
-        
+
         echo -e "${LGR}Copiando archivos a AnyKernel...${NC}"
         cp -v "${ZIMAGE}" "${DTBO_IMG}" "$anykernel/"
-        
+
         cd "$anykernel"
         zip -r AnyKernel.zip *
-        
+
         mkdir -p "$output_dir"
         mv -v AnyKernel.zip "$output_dir/${zip_name}"
-        
+
         echo -e "${LGR}#### Archivo ZIP creado en: $output_dir/${zip_name} ####${NC}"
         exit 0
     else
@@ -114,8 +120,9 @@ completion() {
     fi
 }
 
-# Ejecución principal
+# Ejecución
 clone_tools
 make_defconfig
 compile | tee "${objdir}/log.txt"
+build_dtbo
 completion
