@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Thanks to Adam Spaini for the script (@adams4d13)
+# Thanks to Adam Spaini for the script (@adams4d14)
 
 
 kernel_dir="${PWD}"
@@ -16,8 +16,7 @@ DTBO_IMG="${objdir}/arch/arm64/boot/dtbo.img"
 CLANG_DIR="tc/clang"
 GCC64_DIR="tc/gcc64"
 GCC32_DIR="tc/gcc32"
-MKDTBOIMG_DIR="tc/libufdt"
-MKDTBOIMG="${MKDTBOIMG_DIR}/utils/src/mkdtboimg.py"
+MKDTBOIMG="tc/platform/system/tools/mkdtboimg/mkdtboimg.py"
 DISPLAY="arch/arm64/boot/dts/qcom/xiaomi/overlay/common/display"
 
 export CONFIG_FILE="vayu_defconfig"
@@ -54,20 +53,12 @@ clone_tools() {
         }
     fi
 
-    if ! [ -d "$MKDTBOIMG_DIR" ]; then
-        echo -e "${LYW}Clonando libufdt para mkdtboimg...${NC}"
-        git clone -q --depth=1 https://android.googlesource.com/platform/system/libufdt $MKDTBOIMG_DIR || {
-            echo -e "${RED}Error al clonar libufdt${NC}"
+    if ! [ -d "$MKDTBOIMG" ]; then
+        echo -e "${LYW}Clonando mkdtboimg...${NC}"
+        git clone -q --depth=1 https://android.googlesource.com/platform/system/tools/mkdtboimg $MKDTBOIMG || {
+            echo -e "${RED}Error al clonar mkdtboimg...${NC}"
             exit 1
         }
-
-        if [ -d "$MKDTBOIMG_DIR" ]; then
-            echo -e "${LYW}Compilando mkdtboimg...${NC}"
-            cd "${MKDTBOIMG_DIR}/utils/src" && make || {
-                echo -e "${LYW}No se pudo compilar mkdtboimg, se usará el script Python directamente${NC}"
-            }
-            cd "$kernel_dir"
-        fi
     fi
 }
 
