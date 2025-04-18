@@ -5,45 +5,55 @@
 kernel_dir="${PWD}"
 objdir="${kernel_dir}/out"
 output_dir="${kernel_dir}/output"
-anykernel_dir="tc/anykernel"  # Ruta explícita para AnyKernel
+anykernel_dir="${kernel_dir}/tc/anykernel"
 kernel_name="GoreKernel_Vayu_nonksu"
 zip_name="$kernel_name$(date +"%Y%m%d").zip"
-ZIMAGE=$kernel_dir/out/arch/arm64/boot/Image
-CLANG_DIR="tc/clang"
-GCC64_DIR="tc/gcc64"
-GCC32_DIR="tc/gcc32"
-MKDTBOIMG="tc/libufdt/utils/src/mkdtboimg.py"
+ZIMAGE="${objdir}/arch/arm64/boot/Image"
+CLANG_DIR="${kernel_dir}/tc/clang"
+GCC64_DIR="${kernel_dir}/tc/gcc64"
+GCC32_DIR="${kernel_dir}/tc/gcc32"
+MKDTBOIMG="${kernel_dir}/tc/libufdt/utils/src/mkdtboimg.py"
 
 export CONFIG_FILE="vayu_defconfig"
 export ARCH="arm64"
 export KBUILD_BUILD_HOST=@adams4d13
 export KBUILD_BUILD_USER=arch-linux
-export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
+export PATH="${CLANG_DIR}/bin:${GCC64_DIR}/bin:${GCC32_DIR}/bin:${PATH}"
+
+# Color definitions
+NC='\033[0m'
+RED='\033[0;31m'
+LGR='\033[1;32m'
+LYW='\033[1;33m'
 
 clone_tools() {
+    echo -e "${LYW}Setting up toolchains...${NC}"
+    
+    mkdir -p "${kernel_dir}/tc"
+    
     [ -d "$CLANG_DIR" ] || {
         echo -e "${LYW}Cloning Crdroid Clang...${NC}"
         git clone -q --depth=1 --single-branch \
             https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r547379.git \
-            -b 15.0 $CLANG_DIR || return 1
+            -b 15.0 "$CLANG_DIR"
     }
 
     [ -d "$GCC64_DIR" ] || {
         echo -e "${LYW}Cloning GCC64...${NC}"
         git clone -q --depth=1 --single-branch \
-            https://github.com/mvaisakh/gcc-arm64.git $GCC64_DIR || return 1
+            https://github.com/mvaisakh/gcc-arm64.git "$GCC64_DIR"
     }
 
     [ -d "$GCC32_DIR" ] || {
         echo -e "${LYW}Cloning GCC32...${NC}"
         git clone -q --depth=1 --single-branch \
-            https://github.com/mvaisakh/gcc-arm.git $GCC32_DIR || return 1
+            https://github.com/mvaisakh/gcc-arm.git "$GCC32_DIR"
     }
 
     [ -f "$MKDTBOIMG" ] || {
         echo -e "${LYW}Cloning libufdt...${NC}"
         git clone -q --depth=1 \
-            https://android.googlesource.com/platform/system/libufdt tc/libufdt || return 1
+            https://android.googlesource.com/platform/system/libufdt "${kernel_dir}/tc/libufdt"
     }
 }
 
@@ -53,9 +63,9 @@ make_defconfig() {
 }
 
 compile() {
-    echo -e "${LGR}######### Compilando kernel #########${NC}"
+    echo -e "${LGR}######### Compiling kernel #########${NC}"
     make -j$(nproc) -l$(nproc) \
-        O=out \
+        O=${objdir} \
         ARCH=arm64 \
         CC="ccache clang" \
         SUBARCH=arm64 \
@@ -81,54 +91,60 @@ compile() {
 }
 
 create_images() {
-    python3 $MKDTBOIMG create $anykernel_dir/dtbo.img --page_size=4096 \
-        out/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo
-    find out/arch/arm64/boot/dts/qcom -name 'sm8150-v2*.dtb' -exec cat {} + > $anykernel_dir/dtb
-    python3 $MKDTBOIMG create $anykernel_dir/dtbo-miui.img --page_size=4096 \
-        out/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo
+    echo -e "${LGR}Creating DTBO images...${NC}"
+    
+    mkdir -p "${anykernel_dir}"
+    
+    if [ -f "${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo" ]; then
+        python3 "$MKDTBOIMG" create "${anykernel_dir}/dtbo.img" --page_size=4096 \
+            "${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"
+        
+        if find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' | grep -q .; then
+            find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' -exec cat {} + > "${anykernel_dir}/dtb"
+        else
+            echo -e "${LYW}Warning: No sm8150-v2*.dtb files found${NC}"
+        fi
+    else
+        echo -e "${RED}Error: vayu-sm8150-overlay.dtbo not found${NC}"
+    fi
 }
 
 finalize_build() {
-    cd ${objdir}
-    ZIMAGE=arch/arm64/boot/Image
-    COMPILED_DTBO=arch/arm64/boot/dtbo.img
+    cd "${objdir}"
+    
+    COMPILED_DTBO="${objdir}/arch/arm64/boot/dtbo.img"
+    
     if [[ -f "${ZIMAGE}" && -f "${COMPILED_DTBO}" ]]; then
         echo -e "${LGR}Build successful!${NC}"
         
         if [ ! -d "$anykernel_dir" ]; then
             echo -e "${LYW}Cloning AnyKernel3 to tc/anykernel...${NC}"
-            git clone -q https://github.com/adamspaini/AnyKernel3.git -b master $anykernel_dir
+            git clone -q https://github.com/adamspaini/AnyKernel3.git -b master "$anykernel_dir"
         else
             echo -e "${LYW}Updating AnyKernel in tc/anykernel...${NC}"
-            (cd $anykernel_dir && git pull -q)
+            (cd "$anykernel_dir" && git pull -q)
         fi
 
-        cp -v "${ZIMAGE}" "${COMPILED_DTBO}" "$anykernel_dir/"
-        
+        cp -v "${ZIMAGE}" "${COMPILED_DTBO}" "${anykernel_dir}/"
         mkdir -p "$output_dir"
-        (cd "$anykernel_dir" && zip -r9 "$output_dir/${zip_name}" *)
+        (cd "$anykernel_dir" && zip -r9 "${output_dir}/${zip_name}" ./*)
     
-        echo -e "${LGR}Kernel ZIP: $output_dir/${zip_name}${NC}"
+        echo -e "${LGR}Kernel ZIP: ${output_dir}/${zip_name}${NC}"
     else
         echo -e "${RED}Build failed! Missing:${NC}"
         [ -f "${ZIMAGE}" ] || echo -e "${RED}- ${ZIMAGE}${NC}"
         [ -f "${COMPILED_DTBO}" ] || echo -e "${RED}- ${COMPILED_DTBO}${NC}"
-        exit 1
     fi
 }
-
-# Color definitions
-NC='\033[0m'
-RED='\033[0;31m'
-LGR='\033[1;32m'
-LYW='\033[1;33m'
 
 echo -e "${LYW}Cleaning up space...${NC}"
 sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache 2>/dev/null
 
-clone_tools || exit 1
+# Ejecutar pasos de construcción
+clone_tools
 make_defconfig
 compile
 create_images
 finalize_build
-cd ${kernel_dir}
+
+cd "${kernel_dir}"
