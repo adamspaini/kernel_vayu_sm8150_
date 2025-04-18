@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Thanks to Adam Spaini for the script (@adams4d14)
+# Thanks to Adam Spaini for the script (@adams4d13)
 
 
 kernel_dir="${PWD}"
