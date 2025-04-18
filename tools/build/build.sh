@@ -2,7 +2,6 @@
 
 # Thanks to Adam Spaini for the script (@adams4d14)
 
-
 kernel_dir="${PWD}"
 CCACHE=$(command -v ccache)
 objdir="${kernel_dir}/out"
@@ -16,7 +15,7 @@ DTBO_IMG="${objdir}/arch/arm64/boot/dtbo.img"
 CLANG_DIR="tc/clang"
 GCC64_DIR="tc/gcc64"
 GCC32_DIR="tc/gcc32"
-MKDTBOIMG="tc/platform/system/tools/mkdtboimg/mkdtboimg.py"
+MKDTBOIMG="tc/libufdt/utils/src/mkdtboimg.py"
 DISPLAY="arch/arm64/boot/dts/qcom/xiaomi/overlay/common/display"
 
 export CONFIG_FILE="vayu_defconfig"
@@ -26,7 +25,6 @@ export KBUILD_BUILD_USER=arch-linux
 export KBUILD_BUILD_FEATURES="Dev-Adam"
 
 export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
-
 
 clone_tools() {
     if ! [ -d "$CLANG_DIR" ]; then
@@ -53,10 +51,14 @@ clone_tools() {
         }
     fi
 
-    if ! [ -d "$MKDTBOIMG" ]; then
-        echo -e "${LYW}Clonando mkdtboimg...${NC}"
-        git clone -q --depth=1 https://android.googlesource.com/platform/system/tools/mkdtboimg $MKDTBOIMG || {
-            echo -e "${RED}Error al clonar mkdtboimg...${NC}"
+    if ! [ -f "$MKDTBOIMG" ]; then
+        echo -e "${LYW}Clonando libufdt...${NC}"
+        git clone -q --depth=1 https://android.googlesource.com/platform/system/libufdt tc/libufdt || {
+            echo -e "${RED}Error al clonar libufdt${NC}"
+            exit 1
+        }
+        [ -f "$MKDTBOIMG" ] || {
+            echo -e "${RED}Error: mkdtboimg.py no encontrado después de clonar${NC}"
             exit 1
         }
     fi
@@ -109,7 +111,6 @@ restore() {
     git restore $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
 }
 
-
 sdk() {
     echo -e "${LYW}######### Generando imágenes para SDK #########${NC}"
     
@@ -119,6 +120,7 @@ sdk() {
         python3 "$MKDTBOIMG" create "$anykernel/dtbo-miui.img" --page_size=4096 "$objdir"/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo
     else
         echo -e "${RED}Error: No se encontró mkdtboimg.py para generar imágenes SDK${NC}"
+        exit 1
     fi
 }
 
