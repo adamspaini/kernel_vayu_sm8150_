@@ -13,6 +13,7 @@ CLANG_DIR="${kernel_dir}/tc/clang"
 GCC64_DIR="${kernel_dir}/tc/gcc64"
 GCC32_DIR="${kernel_dir}/tc/gcc32"
 MKDTBOIMG="${kernel_dir}/tc/libufdt/utils/src/mkdtboimg.py"
+DTBO_IMG="${anykernel_dir}/dtbo.img"  # Cambiado a anykernel_dir
 
 export CONFIG_FILE="vayu_defconfig"
 export ARCH="arm64"
@@ -96,7 +97,7 @@ create_images() {
     mkdir -p "${anykernel_dir}"
     
     if [ -f "${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo" ]; then
-        python3 "$MKDTBOIMG" create "${anykernel_dir}/dtbo.img" --page_size=4096 \
+        python3 "$MKDTBOIMG" create "${DTBO_IMG}" --page_size=4096 \
             "${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"
         
         if find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' | grep -q .; then
@@ -106,15 +107,14 @@ create_images() {
         fi
     else
         echo -e "${RED}Error: vayu-sm8150-overlay.dtbo not found${NC}"
+        exit 1
     fi
 }
 
 finalize_build() {
     cd "${objdir}"
     
-    COMPILED_DTBO="${objdir}/arch/arm64/boot/dtbo.img"
-    
-    if [[ -f "${ZIMAGE}" && -f "${COMPILED_DTBO}" ]]; then
+    if [[ -f "${ZIMAGE}" && -f "${DTBO_IMG}" ]]; then
         echo -e "${LGR}Build successful!${NC}"
         
         if [ ! -d "$anykernel_dir" ]; then
@@ -125,7 +125,7 @@ finalize_build() {
             (cd "$anykernel_dir" && git pull -q)
         fi
 
-        cp -v "${ZIMAGE}" "${COMPILED_DTBO}" "${anykernel_dir}/"
+        cp -v "${ZIMAGE}" "${DTBO_IMG}" "${anykernel_dir}/"
         mkdir -p "$output_dir"
         (cd "$anykernel_dir" && zip -r9 "${output_dir}/${zip_name}" ./*)
     
@@ -133,7 +133,8 @@ finalize_build() {
     else
         echo -e "${RED}Build failed! Missing:${NC}"
         [ -f "${ZIMAGE}" ] || echo -e "${RED}- ${ZIMAGE}${NC}"
-        [ -f "${COMPILED_DTBO}" ] || echo -e "${RED}- ${COMPILED_DTBO}${NC}"
+        [ -f "${DTBO_IMG}" ] || echo -e "${RED}- ${DTBO_IMG}${NC}"
+        exit 1
     fi
 }
 
