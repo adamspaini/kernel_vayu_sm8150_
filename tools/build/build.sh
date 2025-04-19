@@ -17,7 +17,7 @@ DTBO_IMG="${anykernel_dir}/dtbo.img"
 
 export CONFIG_FILE="vayu_defconfig"
 export ARCH="arm64"
-export KBUILD_BUILD_HOST=@adams4d13
+export KBUILD_BUILD_HOST=adams4d13
 export KBUILD_BUILD_USER=arch-linux
 export PATH="${CLANG_DIR}/bin:${GCC64_DIR}/bin:${GCC32_DIR}/bin:${PATH}"
 
@@ -57,7 +57,7 @@ clone_tools() {
             https://android.googlesource.com/platform/system/libufdt "${kernel_dir}/tc/libufdt"
     }
 
-    # Aquí se clona AnyKernel3 antes de usarlo
+
     if [ ! -d "$anykernel_dir" ]; then
         echo -e "${LYW}Cloning AnyKernel3 to tc/anykernel...${NC}"
         git clone -q https://github.com/adamspaini/AnyKernel3.git -b master "$anykernel_dir"
