@@ -7,7 +7,7 @@ kernel_dir="${PWD}"
 objdir="${kernel_dir}/out"
 output_dir="${kernel_dir}/output"
 anykernel_dir="${kernel_dir}/tc/anykernel"
-kernel_name="GoreKernel_Vayu_nonksu"
+kernel_name="GoreKernel_vayu_"
 zip_name="$kernel_name$(date +"%Y%m%d").zip"
 ZIMAGE="${objdir}/arch/arm64/boot/Image"
 CLANG_DIR="${kernel_dir}/tc/clang"
@@ -113,22 +113,20 @@ miui() {
 
 
 create_images() {
-    echo -e "${LGR}Creando imágenes DTBO...${NC}"
+    echo -e "${LGR}Creando imágenes DTBO y DTB...${NC}"
     
     mkdir -p "${anykernel_dir}"
     
     local dtbo_input="${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"
     
     if [ -f "$dtbo_input" ]; then
-        # Imagen principal
+        # Imagen DTBO
         python3 "$MKDTBOIMG" create "${DTBO_IMG}" --page_size=4096 "$dtbo_input"
-        
-        # Imagen secundaria para MIUI
         python3 "$MKDTBOIMG" create "${anykernel_dir}/dtbo-miui.img" --page_size=4096 "$dtbo_input"
         
-        # Concatenar DTBs
+        # Concatenar y generar dtb.img
         if find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' | grep -q .; then
-            find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' -exec cat {} + > "${anykernel_dir}/dtb"
+            find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' -exec cat {} + > "${anykernel_dir}/dtb.img"
         else
             echo -e "${LYW}Advertencia: No se encontraron archivos sm8150-v2*.dtb${NC}"
         fi
@@ -145,6 +143,7 @@ restore() {
     git restore $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
 }
 
+
 finalize_build() {
     cd "${objdir}"
     
@@ -152,6 +151,9 @@ finalize_build() {
         echo -e "${LGR}Build successful!${NC}"
 
         cp -v "${ZIMAGE}" "${DTBO_IMG}" "${anykernel_dir}/"
+        
+        [ -f "${anykernel_dir}/dtb.img" ] && cp -v "${anykernel_dir}/dtb.img" "${anykernel_dir}/"
+
         mkdir -p "$output_dir"
         (cd "$anykernel_dir" && zip -r9 "${output_dir}/${zip_name}" ./*)
     
@@ -167,7 +169,6 @@ finalize_build() {
 echo -e "${LYW}Cleaning up space...${NC}"
 sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache 2>/dev/null
 
-# Ejecutar pasos
 clone_tools
 make_defconfig
 compile
