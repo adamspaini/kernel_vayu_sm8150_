@@ -2,7 +2,6 @@
 
 # Thanks to Adam Spaini for the script (@adams4d13)
 
-
 kernel_dir="${PWD}"
 objdir="${kernel_dir}/out"
 output_dir="${kernel_dir}/output"
@@ -28,8 +27,6 @@ NC='\033[0m'
 RED='\033[0;31m'
 LGR='\033[1;32m'
 LYW='\033[1;33m'
-
-
 
 clone_tools() {
     echo -e "${LYW}Setting up toolchains...${NC}"
@@ -68,6 +65,14 @@ clone_tools() {
         echo -e "${LYW}Updating AnyKernel in tc/anykernel...${NC}"
         (cd "$anykernel_dir" && git pull -q)
     fi
+
+    # Agregar KernelSU Next
+    echo -e "${LYW}Integrando KernelSU Next...${NC}"
+    curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -
+
+    # Agregar KernelSU Next-SUSFS
+    echo -e "${LYW}Integrando KernelSU Next-SUSFS...${NC}"
+    curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
 }
 
 make_defconfig() {
@@ -111,7 +116,6 @@ miui() {
     sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
 }
 
-
 create_images() {
     echo -e "${LGR}Creando imágenes DTBO y DTB...${NC}"
     
@@ -120,11 +124,9 @@ create_images() {
     local dtbo_input="${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"
     
     if [ -f "$dtbo_input" ]; then
-        # Imagen DTBO
         python3 "$MKDTBOIMG" create "${DTBO_IMG}" --page_size=4096 "$dtbo_input"
         python3 "$MKDTBOIMG" create "${anykernel_dir}/dtbo-miui.img" --page_size=4096 "$dtbo_input"
         
-        # Concatenar y generar dtb.img
         if find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' | grep -q .; then
             find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' -exec cat {} + > "${anykernel_dir}/dtb.img"
         else
@@ -136,13 +138,11 @@ create_images() {
     fi
 }
 
-
 restore() {
     echo -e "${LYW}Restaurando archivos de panel modificados...${NC}"
     git restore $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
     git restore $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
 }
-
 
 finalize_build() {
     cd "${objdir}"
