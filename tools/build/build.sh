@@ -13,7 +13,7 @@ CLANG_DIR="${kernel_dir}/tc/clang"
 GCC64_DIR="${kernel_dir}/tc/gcc64"
 GCC32_DIR="${kernel_dir}/tc/gcc32"
 MKDTBOIMG="${kernel_dir}/tc/libufdt/utils/src/mkdtboimg.py"
-DTBO_IMG="${anykernel_dir}/dtbo.img"  # Cambiado a anykernel_dir
+DTBO_IMG="${anykernel_dir}/dtbo.img"
 
 export CONFIG_FILE="vayu_defconfig"
 export ARCH="arm64"
@@ -21,7 +21,7 @@ export KBUILD_BUILD_HOST=@adams4d13
 export KBUILD_BUILD_USER=arch-linux
 export PATH="${CLANG_DIR}/bin:${GCC64_DIR}/bin:${GCC32_DIR}/bin:${PATH}"
 
-# Color definitions
+# Colores
 NC='\033[0m'
 RED='\033[0;31m'
 LGR='\033[1;32m'
@@ -31,7 +31,7 @@ clone_tools() {
     echo -e "${LYW}Setting up toolchains...${NC}"
     
     mkdir -p "${kernel_dir}/tc"
-    
+
     [ -d "$CLANG_DIR" ] || {
         echo -e "${LYW}Cloning Crdroid Clang...${NC}"
         git clone -q --depth=1 --single-branch \
@@ -56,6 +56,15 @@ clone_tools() {
         git clone -q --depth=1 \
             https://android.googlesource.com/platform/system/libufdt "${kernel_dir}/tc/libufdt"
     }
+
+    # Aquí se clona AnyKernel3 antes de usarlo
+    if [ ! -d "$anykernel_dir" ]; then
+        echo -e "${LYW}Cloning AnyKernel3 to tc/anykernel...${NC}"
+        git clone -q https://github.com/adamspaini/AnyKernel3.git -b master "$anykernel_dir"
+    else
+        echo -e "${LYW}Updating AnyKernel in tc/anykernel...${NC}"
+        (cd "$anykernel_dir" && git pull -q)
+    fi
 }
 
 make_defconfig() {
@@ -116,14 +125,6 @@ finalize_build() {
     
     if [[ -f "${ZIMAGE}" && -f "${DTBO_IMG}" ]]; then
         echo -e "${LGR}Build successful!${NC}"
-        
-        if [ ! -d "$anykernel_dir" ]; then
-            echo -e "${LYW}Cloning AnyKernel3 to tc/anykernel...${NC}"
-            git clone -q https://github.com/adamspaini/AnyKernel3.git -b master "$anykernel_dir"
-        else
-            echo -e "${LYW}Updating AnyKernel in tc/anykernel...${NC}"
-            (cd "$anykernel_dir" && git pull -q)
-        fi
 
         cp -v "${ZIMAGE}" "${DTBO_IMG}" "${anykernel_dir}/"
         mkdir -p "$output_dir"
@@ -141,7 +142,7 @@ finalize_build() {
 echo -e "${LYW}Cleaning up space...${NC}"
 sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache 2>/dev/null
 
-# Ejecutar pasos de construcción
+# Ejecutar pasos
 clone_tools
 make_defconfig
 compile
