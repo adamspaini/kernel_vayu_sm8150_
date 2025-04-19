@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Kernel build script for Vayu (Poco X3 Pro)
+# Thanks to Adam Spaini for the script (@adams4d13)
+
 
 kernel_dir="${PWD}"
 objdir="${kernel_dir}/out"
@@ -14,6 +15,7 @@ GCC64_DIR="${kernel_dir}/tc/gcc64"
 GCC32_DIR="${kernel_dir}/tc/gcc32"
 MKDTBOIMG="${kernel_dir}/tc/libufdt/utils/src/mkdtboimg.py"
 DTBO_IMG="${anykernel_dir}/dtbo.img"
+DISPLAY="arch/arm64/boot/dts/qcom/xiaomi/overlay/common/display"
 
 export CONFIG_FILE="vayu_defconfig"
 export ARCH="arm64"
@@ -26,6 +28,8 @@ NC='\033[0m'
 RED='\033[0;31m'
 LGR='\033[1;32m'
 LYW='\033[1;33m'
+
+
 
 clone_tools() {
     echo -e "${LYW}Setting up toolchains...${NC}"
@@ -56,7 +60,6 @@ clone_tools() {
         git clone -q --depth=1 \
             https://android.googlesource.com/platform/system/libufdt "${kernel_dir}/tc/libufdt"
     }
-
 
     if [ ! -d "$anykernel_dir" ]; then
         echo -e "${LYW}Cloning AnyKernel3 to tc/anykernel...${NC}"
@@ -100,24 +103,46 @@ compile() {
         LLVM_IAS=1
 }
 
+miui() {
+    echo -e "${LYW}Aplicando ajustes para MIUI (brillo y resolución del panel)...${NC}"
+    sed -i 's/<70>/<695>/g'   $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
+    sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
+    sed -i 's/<70>/<695>/g'   $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
+    sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
+}
+
+
 create_images() {
-    echo -e "${LGR}Creating DTBO images...${NC}"
+    echo -e "${LGR}Creando imágenes DTBO...${NC}"
     
     mkdir -p "${anykernel_dir}"
     
-    if [ -f "${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo" ]; then
-        python3 "$MKDTBOIMG" create "${DTBO_IMG}" --page_size=4096 \
-            "${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"
+    local dtbo_input="${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"
+    
+    if [ -f "$dtbo_input" ]; then
+        # Imagen principal
+        python3 "$MKDTBOIMG" create "${DTBO_IMG}" --page_size=4096 "$dtbo_input"
         
+        # Imagen secundaria para MIUI
+        python3 "$MKDTBOIMG" create "${anykernel_dir}/dtbo-miui.img" --page_size=4096 "$dtbo_input"
+        
+        # Concatenar DTBs
         if find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' | grep -q .; then
             find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' -exec cat {} + > "${anykernel_dir}/dtb"
         else
-            echo -e "${LYW}Warning: No sm8150-v2*.dtb files found${NC}"
+            echo -e "${LYW}Advertencia: No se encontraron archivos sm8150-v2*.dtb${NC}"
         fi
     else
-        echo -e "${RED}Error: vayu-sm8150-overlay.dtbo not found${NC}"
+        echo -e "${RED}Error: No se encontró vayu-sm8150-overlay.dtbo${NC}"
         exit 1
     fi
+}
+
+
+restore() {
+    echo -e "${LYW}Restaurando archivos de panel modificados...${NC}"
+    git restore $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
+    git restore $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
 }
 
 finalize_build() {
