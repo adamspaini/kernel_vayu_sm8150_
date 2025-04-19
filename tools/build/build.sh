@@ -66,6 +66,17 @@ clone_tools() {
         (cd "$anykernel_dir" && git pull -q)
     fi
 
+    # Integrar xusfs antes de KernelSU para evitar el error de susfs.h
+    echo -e "${LYW}Integrando xusfs4Ksu...${NC}"
+    if [ ! -d "${kernel_dir}/xusfs4Ksu" ]; then
+        git clone -q https://github.com/sluonquan/xusfs4Ksu.git
+        cd xusfs4Ksu
+        ./install.sh "${kernel_dir}"
+        cd ..
+    else
+        echo -e "${LYW}xusfs4Ksu ya está integrado${NC}"
+    fi
+
     # Agregar KernelSU Next
     echo -e "${LYW}Integrando KernelSU Next...${NC}"
     curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -
