@@ -76,109 +76,27 @@ clone_tools() {
     fi
 
     # Aplicar parche de KernelSU
+    git config --global user.email "bagaskara815@gmail.com"
+    git config --global user.name "bagaskara815"
     echo -e "${LYW}Aplicando parche de KernelSU...${NC}"
-    curl -sSL "https://gist.githubusercontent.com/bagaskara815/5aeb07f0d9031189871ffa362591b20f/raw/ksu.patch" -o ksu.patch
-    git am ksu.patch || { echo -e "${RED}Fallo al aplicar el parche${NC}"; exit 1; }
+    curl -sSL "https://gist.githubusercontent.com/bagaskara815/5aeb07f0d9031189871ffa362591b20f/raw/ksu.patch" -o "${kernel_dir}/ksu.patch"
+    git -C "$kernel_dir" am ksu.patch || { echo "Fallo al aplicar el parche"; exit 1; }
 
-    # Setup de KernelSU Next
-    echo -e "${LYW}Ejecutando setup de KernelSU Next...${NC}"
-    curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+    # Agregar KernelSU Next
+    echo -e "${LYW}Integrando KernelSU Next...${NC}"
+    curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -
 
-    # Setup de KernelSU Next-SUSFS
-    echo -e "${LYW}Ejecutando setup de KernelSU Next-SUSFS...${NC}"
+    # Agregar KernelSU Next-SUSFS
+    echo -e "${LYW}Integrando KernelSU Next-SUSFS...${NC}"
     curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
 }
 
-make_defconfig() {
-    echo -e "${LGR}Generating Defconfig${NC}"
-    make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc)
-}
-
-compile() {
-    echo -e "${LGR}######### Compiling kernel #########${NC}"
-    make -j$(nproc) -l$(nproc) \
-        O=${objdir} \
-        ARCH=arm64 \
-        CC="ccache clang" \
-        SUBARCH=arm64 \
-        DTC_EXT=dtc \
-        CLANG_TRIPLE=aarch64-linux-gnu- \
-        CROSS_COMPILE=aarch64-linux-gnu- \
-        CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-        CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-        AR=llvm-ar \
-        STRIP=llvm-strip \
-        OBJCOPY=llvm-objcopy \
-        OBJDUMP=llvm-objdump \
-        READELF=llvm-readelf \
-        HOSTCC=clang \
-        HOSTCXX=clang++ \
-        HOSTAR=llvm-ar \
-        HOSTLD=ld.lld \
-        LLVM_NM=llvm-nm \
-        LD=ld.lld \
-        NM=llvm-nm \
-        LLVM=1 \
-        LLVM_IAS=1
-}
-
-miui() {
-    echo -e "${LYW}Aplicando ajustes para MIUI (brillo y resolución del panel)...${NC}"
-    sed -i 's/<70>/<695>/g'   $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
-    sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
-    sed -i 's/<70>/<695>/g'   $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
-    sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
-}
-
-create_images() {
-    echo -e "${LGR}Creando imágenes DTBO y DTB...${NC}"
-    
-    mkdir -p "${anykernel_dir}"
-    
-    local dtbo_input="${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"
-    
-    if [ -f "$dtbo_input" ]; then
-        python3 "$MKDTBOIMG" create "${DTBO_IMG}" --page_size=4096 "$dtbo_input"
-        python3 "$MKDTBOIMG" create "${anykernel_dir}/dtbo-miui.img" --page_size=4096 "$dtbo_input"
-        
-        if find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' | grep -q .; then
-            find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' -exec cat {} + > "${anykernel_dir}/dtb.img"
-        else
-            echo -e "${LYW}Advertencia: No se encontraron archivos sm8150-v2*.dtb${NC}"
-        fi
-    else
-        echo -e "${RED}Error: No se encontró vayu-sm8150-overlay.dtbo${NC}"
-        exit 1
-    fi
-}
-
-restore() {
-    echo -e "${LYW}Restaurando archivos de panel modificados...${NC}"
-    git restore $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
-    git restore $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
-}
-
-finalize_build() {
-    cd "${objdir}"
-    
-    if [[ -f "${ZIMAGE}" && -f "${DTBO_IMG}" ]]; then
-        echo -e "${LGR}Build successful!${NC}"
-
-        cp -v "${ZIMAGE}" "${DTBO_IMG}" "${anykernel_dir}/"
-        
-        [ -f "${anykernel_dir}/dtb.img" ] && cp -v "${anykernel_dir}/dtb.img" "${anykernel_dir}/"
-
-        mkdir -p "$output_dir"
-        (cd "$anykernel_dir" && zip -r9 "${output_dir}/${zip_name}" ./*)
-    
-        echo -e "${LGR}Kernel ZIP: ${output_dir}/${zip_name}${NC}"
-    else
-        echo -e "${RED}Build failed! Missing:${NC}"
-        [ -f "${ZIMAGE}" ] || echo -e "${RED}- ${ZIMAGE}${NC}"
-        [ -f "${DTBO_IMG}" ] || echo -e "${RED}- ${DTBO_IMG}${NC}"
-        exit 1
-    fi
-}
+make_defconfig() { ... }
+compile() { ... }
+miui() { ... }
+create_images() { ... }
+restore() { ... }
+finalize_build() { ... }
 
 echo -e "${LYW}Cleaning up space...${NC}"
 sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache 2>/dev/null
