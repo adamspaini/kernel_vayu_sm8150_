@@ -6,7 +6,7 @@ kernel_dir="${PWD}"
 objdir="${kernel_dir}/out"
 output_dir="${kernel_dir}/output"
 anykernel_dir="${kernel_dir}/tc/anykernel"
-kernel_name="GoreKernel_vayu_ksu"
+kernel_name="GoreKernel_vayu_ksu-"
 zip_name="$kernel_name$(date +"%Y%m%d").zip"
 ZIMAGE="${objdir}/arch/arm64/boot/Image"
 CLANG_DIR="${kernel_dir}/tc/clang"
@@ -22,7 +22,6 @@ export KBUILD_BUILD_HOST=adams4d13
 export KBUILD_BUILD_USER=arch-linux
 export PATH="${CLANG_DIR}/bin:${GCC64_DIR}/bin:${GCC32_DIR}/bin:${PATH}"
 
-Colores
 
 NC='\033[0m'
 RED='\033[0;31m'
