@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# Thanks to Adam Spaini for the script (@adams4d13)
-
+#Thanks to Adam Spaini for the script (@adams4d13)
 
 kernel_dir="${PWD}"
 objdir="${kernel_dir}/out"
 output_dir="${kernel_dir}/output"
 anykernel_dir="${kernel_dir}/tc/anykernel"
-kernel_name="GoreKernel_vayu_"
+kernel_name="GoreKernel_vayu_ksu-"
 zip_name="$kernel_name$(date +"%Y%m%d").zip"
 ZIMAGE="${objdir}/arch/arm64/boot/Image"
 CLANG_DIR="${kernel_dir}/tc/clang"
@@ -23,13 +22,11 @@ export KBUILD_BUILD_HOST=adams4d13
 export KBUILD_BUILD_USER=arch-linux
 export PATH="${CLANG_DIR}/bin:${GCC64_DIR}/bin:${GCC32_DIR}/bin:${PATH}"
 
-# Colores
+
 NC='\033[0m'
 RED='\033[0;31m'
 LGR='\033[1;32m'
 LYW='\033[1;33m'
-
-
 
 clone_tools() {
     echo -e "${LYW}Setting up toolchains...${NC}"
@@ -63,107 +60,125 @@ clone_tools() {
 
     if [ ! -d "$anykernel_dir" ]; then
         echo -e "${LYW}Cloning AnyKernel3 to tc/anykernel...${NC}"
-        git clone -q https://github.com/adamspaini/AnyKernel3.git -b master "$anykernel_dir"
+        git clone -q https://github.com/adamspaini/AnyKernel3.git -b ksu-next "$anykernel_dir"
     else
         echo -e "${LYW}Updating AnyKernel in tc/anykernel...${NC}"
         (cd "$anykernel_dir" && git pull -q)
     fi
+
+    echo -e "${LYW}Configuring Git identity...${NC}"
+    git config --global user.email "bagaskara815@gmail.com"
+    git config --global user.name "bagaskara815"
+
+    echo -e "${LYW}Downloading and applying KSU patch...${NC}"
+    curl -LSs https://gist.githubusercontent.com/bagaskara815/5aeb07f0d9031189871ffa362591b20f/raw/ksu.patch -o ksu.patch
+    git am ksu.patch
+
+    echo -e "${LYW}Integrando KernelSU Next...${NC}"
+    if ! grep -q "KernelSU-Next" <<< "$(cat setup.sh 2>/dev/null)"; then
+        curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -
+    else
+        echo -e "${LGR}KernelSU Next ya está integrado.${NC}"
+    fi
+
+    echo -e "${LYW}Clonando susfs4ksu...${NC}"
+    [ -d "${kernel_dir}/tc/susfs4ksu" ] || git clone -q --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git "${kernel_dir}/tc/susfs4ksu"
+
+    echo -e "${LYW}Integrando susfs4ksu...${NC}"
+    cp -rv "${kernel_dir}/tc/susfs4ksu"/{fs,include}/* "${kernel_dir}"/{fs,include}/
 }
 
 make_defconfig() {
-    echo -e "${LGR}Generating Defconfig${NC}"
-    make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc)
+echo -e "${LGR}Generating Defconfig${NC}"
+make -s ARCH=${ARCH} O=${objdir} ${CONFIG_FILE} -j$(nproc)
 }
 
 compile() {
-    echo -e "${LGR}######### Compiling kernel #########${NC}"
-    make -j$(nproc) -l$(nproc) \
-        O=${objdir} \
-        ARCH=arm64 \
-        CC="ccache clang" \
-        SUBARCH=arm64 \
-        DTC_EXT=dtc \
-        CLANG_TRIPLE=aarch64-linux-gnu- \
-        CROSS_COMPILE=aarch64-linux-gnu- \
-        CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-        CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
-        AR=llvm-ar \
-        STRIP=llvm-strip \
-        OBJCOPY=llvm-objcopy \
-        OBJDUMP=llvm-objdump \
-        READELF=llvm-readelf \
-        HOSTCC=clang \
-        HOSTCXX=clang++ \
-        HOSTAR=llvm-ar \
-        HOSTLD=ld.lld \
-        LLVM_NM=llvm-nm \
-        LD=ld.lld \
-        NM=llvm-nm \
-        LLVM=1 \
-        LLVM_IAS=1
+echo -e "${LGR}######### Compiling kernel #########${NC}"
+make -j$(nproc) -l$(nproc) \
+O=${objdir} \
+ARCH=arm64 \
+CC="ccache clang" \
+SUBARCH=arm64 \
+DTC_EXT=dtc \
+CLANG_TRIPLE=aarch64-linux-gnu- \
+CROSS_COMPILE=aarch64-linux-gnu- \
+CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+AR=llvm-ar \
+STRIP=llvm-strip \
+OBJCOPY=llvm-objcopy \
+OBJDUMP=llvm-objdump \
+READELF=llvm-readelf \
+HOSTCC=clang \
+HOSTCXX=clang++ \
+HOSTAR=llvm-ar \
+HOSTLD=ld.lld \
+LLVM_NM=llvm-nm \
+LD=ld.lld \
+NM=llvm-nm \
+LLVM=1 \
+LLVM_IAS=1
 }
 
 miui() {
-    echo -e "${LYW}Aplicando ajustes para MIUI (brillo y resolución del panel)...${NC}"
-    sed -i 's/<70>/<695>/g'   $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
-    sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
-    sed -i 's/<70>/<695>/g'   $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
-    sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
+echo -e "${LYW}Aplicando ajustes para MIUI (brillo y resolución del panel)...${NC}"
+sed -i 's/<70>/<695>/g'   $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
+sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
+sed -i 's/<70>/<695>/g'   $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
+sed -i 's/<154>/<1546>/g' $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
 }
-
 
 create_images() {
-    echo -e "${LGR}Creando imágenes DTBO y DTB...${NC}"
-    
-    mkdir -p "${anykernel_dir}"
-    
-    local dtbo_input="${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"
-    
-    if [ -f "$dtbo_input" ]; then
-        # Imagen DTBO
-        python3 "$MKDTBOIMG" create "${DTBO_IMG}" --page_size=4096 "$dtbo_input"
-        python3 "$MKDTBOIMG" create "${anykernel_dir}/dtbo-miui.img" --page_size=4096 "$dtbo_input"
-        
-        # Concatenar y generar dtb.img
-        if find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' | grep -q .; then
-            find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' -exec cat {} + > "${anykernel_dir}/dtb.img"
-        else
-            echo -e "${LYW}Advertencia: No se encontraron archivos sm8150-v2*.dtb${NC}"
-        fi
-    else
-        echo -e "${RED}Error: No se encontró vayu-sm8150-overlay.dtbo${NC}"
-        exit 1
-    fi
-}
+echo -e "${LGR}Creando imágenes DTBO y DTB...${NC}"
 
+mkdir -p "${anykernel_dir}"  
+  
+local dtbo_input="${objdir}/arch/arm64/boot/dts/qcom/vayu-sm8150-overlay.dtbo"  
+  
+if [ -f "$dtbo_input" ]; then  
+    python3 "$MKDTBOIMG" create "${DTBO_IMG}" --page_size=4096 "$dtbo_input"  
+    python3 "$MKDTBOIMG" create "${anykernel_dir}/dtbo-miui.img" --page_size=4096 "$dtbo_input"  
+      
+    if find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' | grep -q .; then  
+        find "${objdir}/arch/arm64/boot/dts/qcom" -name 'sm8150-v2*.dtb' -exec cat {} + > "${anykernel_dir}/dtb.img"  
+    else  
+        echo -e "${LYW}Advertencia: No se encontraron archivos sm8150-v2*.dtb${NC}"  
+    fi  
+else  
+    echo -e "${RED}Error: No se encontró vayu-sm8150-overlay.dtbo${NC}"  
+    exit 1  
+fi
+
+}
 
 restore() {
-    echo -e "${LYW}Restaurando archivos de panel modificados...${NC}"
-    git restore $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
-    git restore $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
+echo -e "${LYW}Restaurando archivos de panel modificados...${NC}"
+git restore $DISPLAY/dsi-panel-j20s-36-02-0a-lcd-dsc-vid.dtsi
+git restore $DISPLAY/dsi-panel-j20s-42-02-0b-lcd-dsc-vid.dtsi
 }
 
-
 finalize_build() {
-    cd "${objdir}"
-    
-    if [[ -f "${ZIMAGE}" && -f "${DTBO_IMG}" ]]; then
-        echo -e "${LGR}Build successful!${NC}"
+cd "${objdir}"
 
-        cp -v "${ZIMAGE}" "${DTBO_IMG}" "${anykernel_dir}/"
-        
-        [ -f "${anykernel_dir}/dtb.img" ] && cp -v "${anykernel_dir}/dtb.img" "${anykernel_dir}/"
+if [[ -f "${ZIMAGE}" && -f "${DTBO_IMG}" ]]; then  
+    echo -e "${LGR}Build successful!${NC}"  
 
-        mkdir -p "$output_dir"
-        (cd "$anykernel_dir" && zip -r9 "${output_dir}/${zip_name}" ./*)
-    
-        echo -e "${LGR}Kernel ZIP: ${output_dir}/${zip_name}${NC}"
-    else
-        echo -e "${RED}Build failed! Missing:${NC}"
-        [ -f "${ZIMAGE}" ] || echo -e "${RED}- ${ZIMAGE}${NC}"
-        [ -f "${DTBO_IMG}" ] || echo -e "${RED}- ${DTBO_IMG}${NC}"
-        exit 1
-    fi
+    cp -v "${ZIMAGE}" "${DTBO_IMG}" "${anykernel_dir}/"  
+      
+    [ -f "${anykernel_dir}/dtb.img" ] && cp -v "${anykernel_dir}/dtb.img" "${anykernel_dir}/"  
+
+    mkdir -p "$output_dir"  
+    (cd "$anykernel_dir" && zip -r9 "${output_dir}/${zip_name}" ./*)  
+  
+    echo -e "${LGR}Kernel ZIP: ${output_dir}/${zip_name}${NC}"  
+else  
+    echo -e "${RED}Build failed! Missing:${NC}"  
+    [ -f "${ZIMAGE}" ] || echo -e "${RED}- ${ZIMAGE}${NC}"  
+    [ -f "${DTBO_IMG}" ] || echo -e "${RED}- ${DTBO_IMG}${NC}"  
+    exit 1  
+fi
+
 }
 
 echo -e "${LYW}Cleaning up space...${NC}"
