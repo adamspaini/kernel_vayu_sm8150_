@@ -60,7 +60,7 @@ clone_tools() {
 
     if [ ! -d "$anykernel_dir" ]; then
         echo -e "${LYW}Cloning AnyKernel3 to tc/anykernel...${NC}"
-        git clone -q https://github.com/adamspaini/AnyKernel3.git -b master "$anykernel_dir"
+        git clone -q https://github.com/adamspaini/AnyKernel3.git -b ksu-next "$anykernel_dir"
     else
         echo -e "${LYW}Updating AnyKernel in tc/anykernel...${NC}"
         (cd "$anykernel_dir" && git pull -q)
