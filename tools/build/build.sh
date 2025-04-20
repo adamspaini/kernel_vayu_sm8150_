@@ -1,6 +1,6 @@
 #!/bin/bash
 
-Thanks to Adam Spaini for the script (@adams4d13)
+#Thanks to Adam Spaini for the script (@adams4d13)
 
 kernel_dir="${PWD}"
 objdir="${kernel_dir}/out"
