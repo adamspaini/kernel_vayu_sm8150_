@@ -66,23 +66,26 @@ clone_tools() {
         (cd "$anykernel_dir" && git pull -q)
     fi
 
-    # Integrar xusfs antes de KernelSU para evitar el error de susfs.h
+    # Integrar xusfs4Ksu
     echo -e "${LYW}Integrando xusfs4Ksu...${NC}"
     if [ ! -d "${kernel_dir}/xusfs4Ksu" ]; then
-        git clone -q https://github.com/sluonquan/xusfs4Ksu.git
-        cd xusfs4Ksu
-        ./install.sh "${kernel_dir}"
-        cd ..
+        git clone -q https://github.com/sluonquan/xusfs4Ksu.git "${kernel_dir}/xusfs4Ksu"
+        bash "${kernel_dir}/xusfs4Ksu/install.sh" "${kernel_dir}"
     else
         echo -e "${LYW}xusfs4Ksu ya está integrado${NC}"
     fi
 
-    # Agregar KernelSU Next
-    echo -e "${LYW}Integrando KernelSU Next...${NC}"
-    curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -
+    # Aplicar parche de KernelSU
+    echo -e "${LYW}Aplicando parche de KernelSU...${NC}"
+    curl -sSL "https://gist.githubusercontent.com/bagaskara815/5aeb07f0d9031189871ffa362591b20f/raw/ksu.patch" -o ksu.patch
+    git am ksu.patch || { echo -e "${RED}Fallo al aplicar el parche${NC}"; exit 1; }
 
-    # Agregar KernelSU Next-SUSFS
-    echo -e "${LYW}Integrando KernelSU Next-SUSFS...${NC}"
+    # Setup de KernelSU Next
+    echo -e "${LYW}Ejecutando setup de KernelSU Next...${NC}"
+    curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+
+    # Setup de KernelSU Next-SUSFS
+    echo -e "${LYW}Ejecutando setup de KernelSU Next-SUSFS...${NC}"
     curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
 }
 
