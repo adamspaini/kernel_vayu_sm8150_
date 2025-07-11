@@ -82,7 +82,7 @@ clone_tools() {
     fi
 
     echo -e "${LYW}Clonando susfs4ksu...${NC}"
-    [ -d "${kernel_dir}/tc/susfs4ksu" ] || git clone -q --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git "${kernel_dir}/tc/susfs4ksu"
+    [ -d "${kernel_dir}/tc/susfs4ksu" ] || git clone -q --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b master "${kernel_dir}/tc/susfs4ksu"
 
     echo -e "${LYW}Integrando susfs4ksu...${NC}"
     cp -rv "${kernel_dir}/tc/susfs4ksu"/{fs,include}/* "${kernel_dir}"/{fs,include}/
